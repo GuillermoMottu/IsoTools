@@ -1,0 +1,133 @@
+name: Deploy ORCA tools to Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: Tool to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - compare_planned_vs_actual
+          - track_project_progress
+
+concurrency:
+  group: deploy-orca-tools-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy_compare:
+    name: deploy compare_planned_vs_actual
+    runs-on: ubuntu-latest
+
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.tool == 'all' || inputs.tool == 'compare_planned_vs_actual' }}
+
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE: ${{ vars.COMPARE_PLANNED_VS_ACTUAL_RAILWAY_SERVICE || 'compare-planned-vs-actual' }}
+      RAILWAY_DOCKERFILE_PATH: Docker/compare_planned_vs_actual.Dockerfile
+      HEALTH_URL: ${{ vars.COMPARE_PLANNED_VS_ACTUAL_HEALTH_URL || '' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Railway token
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::Missing GitHub secret RAILWAY_TOKEN."
+            exit 1
+          fi
+
+      - name: Verify ORCA deployment config
+        run: |
+          if [ ! -f "$RAILWAY_DOCKERFILE_PATH" ]; then
+            echo "::error::Missing Dockerfile: $RAILWAY_DOCKERFILE_PATH"
+            exit 1
+          fi
+          echo "Service: $RAILWAY_SERVICE"
+          echo "Dockerfile: $RAILWAY_DOCKERFILE_PATH"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy
+        run: railway up --service "$RAILWAY_SERVICE" --ci
+
+      - name: Smoke health
+        if: ${{ env.HEALTH_URL != '' }}
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "OK: health returned 200 on attempt $i"
+              exit 0
+            fi
+            echo "attempt $i/30: HTTP $code; retrying in 10s"
+            sleep 10
+          done
+          echo "::error::health URL did not return 200 after 5 minutes."
+          exit 1
+
+  deploy_track:
+    name: deploy track_project_progress
+    runs-on: ubuntu-latest
+
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.tool == 'all' || inputs.tool == 'track_project_progress' }}
+
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE: ${{ vars.TRACK_PROJECT_PROGRESS_RAILWAY_SERVICE || 'track-project-progress' }}
+      RAILWAY_DOCKERFILE_PATH: Docker/track_project_progress.Dockerfile
+      HEALTH_URL: ${{ vars.TRACK_PROJECT_PROGRESS_HEALTH_URL || '' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Railway token
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::Missing GitHub secret RAILWAY_TOKEN."
+            exit 1
+          fi
+
+      - name: Verify ORCA deployment config
+        run: |
+          if [ ! -f "$RAILWAY_DOCKERFILE_PATH" ]; then
+            echo "::error::Missing Dockerfile: $RAILWAY_DOCKERFILE_PATH"
+            exit 1
+          fi
+          echo "Service: $RAILWAY_SERVICE"
+          echo "Dockerfile: $RAILWAY_DOCKERFILE_PATH"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy
+        run: railway up --service "$RAILWAY_SERVICE" --ci
+
+      - name: Smoke health
+        if: ${{ env.HEALTH_URL != '' }}
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "OK: health returned 200 on attempt $i"
+              exit 0
+            fi
+            echo "attempt $i/30: HTTP $code; retrying in 10s"
+            sleep 10
+          done
+          echo "::error::health URL did not return 200 after 5 minutes."
+          exit 1
