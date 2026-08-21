@@ -415,10 +415,14 @@ function buildResult (input, thresholds) {
   }
 }
 
-export function handler (event) {
+export function evaluatePlannedVsActual (event) {
   const input = normalizeInput(event.data || {}, event.asset || {})
   const thresholds = mergeThresholds(input.thresholds)
-  const result = buildResult(input, thresholds)
+  return buildResult(input, thresholds)
+}
+
+export function handler (event) {
+  const result = evaluatePlannedVsActual(event)
 
   return {
     event: {

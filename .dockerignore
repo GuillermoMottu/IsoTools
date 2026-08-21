@@ -3,8 +3,9 @@
 # binarios compilados para el host equivocado.
 **/node_modules
 web/dist
+demo-frontend/dist
 .env
-.env.local
+.env.*
 .git
 npm-debug.log*
 docker-compose.yml

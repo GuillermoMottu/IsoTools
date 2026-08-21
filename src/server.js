@@ -33,6 +33,7 @@ import consoleRouter from './routes/consoleRoutes.js';
 import authRouter from './routes/authRoutes.js';
 import { attachSession, authMode } from './auth/index.js';
 import { createSpaRouter } from './middleware/spa.js';
+import toolRouter from './routes/toolRoutes.js';
 
 const app = express();
 
@@ -53,6 +54,10 @@ app.get('/api/v1/health', (req, res) => {
   res.json({ status: 'ok', service: 'isotools', time: new Date().toISOString() });
 });
 
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'isotools-tool', time: new Date().toISOString() });
+});
+
 app.get('/api/v1/ready', async (req, res) => {
   try {
     await pingDb();
@@ -68,6 +73,7 @@ app.use('/auth', authRouter);
 // API de tools (maquina), catalogo (publico) y consola (humano).
 app.use('/api/v1/events', eventsRouter);
 app.use('/api/v1/catalog', catalogRouter);
+app.use('/api/tool', toolRouter);
 app.use('/api/v1/console', consoleRouter);
 
 // Cualquier cosa bajo /api que no exista es un 404 JSON. Va antes del SPA para que
