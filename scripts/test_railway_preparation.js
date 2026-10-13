@@ -5,8 +5,11 @@ import { deploymentIsCurrent } from './wait_tool_deployment.js'
 
 const tool = 'compare_planned_vs_actual'
 const service = 'compare-planned-vs-actual'
-const initial = runtimePlan(tool, service, { ISOTOOLS_API_KEY: 'never-change-this-key' }, { volumes: [] })
+const serviceId = 'e3638694-09d1-4e56-9060-207657d62b89'
+const initial = runtimePlan(tool, service, { RAILWAY_SERVICE_ID: serviceId, ISOTOOLS_API_KEY: 'never-change-this-key' }, { volumes: [] })
 assert.equal(initial.createVolume, true)
+assert.equal(initial.volumeServiceId, serviceId, 'volume creation uses the service ID rather than its name')
+assert.throws(() => runtimePlan(tool, service, {}, { volumes: [] }), /missing_volume_service_id/)
 assert.ok(initial.assignments.includes('TOOL_STATE_DIR=/data'))
 assert.ok(initial.assignments.includes('TOOL_CONSUMER_ENABLED=false'))
 assert.ok(initial.assignments.every(value => !value.includes('never-change-this-key') && !value.startsWith('ISOTOOLS_API_KEY=')))
