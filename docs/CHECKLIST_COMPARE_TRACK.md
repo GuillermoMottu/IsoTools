@@ -4,6 +4,43 @@ Trabajo local en `comm/sync_erp_data_local__compare_planned_vs_actual`.
 Este documento distingue lo probado localmente de la aceptación en Railway.
 No se ha desplegado esta versión ni publicado eventos en el bus productivo.
 
+## Resultado de inspección con el token del workflow — 2026-10-13
+
+Se publicaron únicamente el workflow, el inspector, su prueba y este documento en
+el fork `GuillermoMottu/IsoTools`, rama `comm/sync_erp_data_local__compare_planned_vs_actual`.
+La inspección final [38474376305](https://github.com/GuillermoMottu/IsoTools/actions/runs/38474376305)
+terminó correctamente en ambas tools usando el token existente. Los logs confirman
+`DEPLOY_REQUESTED: false` y ninguna ejecución de `railway up`.
+
+| Comprobación | compare | track |
+| --- | --- | --- |
+| Dominio encontrado | `cpa.orcalabs.mx` | `tpp.orcalabs.mx` |
+| `/health` anónimo | HTTP 200 | HTTP 200 |
+| `/auth/me` | HTTP 200, `mode: open` | HTTP 200, `mode: open` |
+| `ISOTOOLS_API_URL` | Sin configurar | Sin configurar |
+| `ISOTOOLS_API_KEY` | Configurada; API central responde HTTP 401 | Configurada; API central responde HTTP 401 |
+| Volumen montado en `/data` | No; listado de volúmenes consultado | No; listado de volúmenes consultado |
+| `TOOL_CONSUMER_ENABLED=true` | No | No |
+| Configuración de negocio montada | No | No |
+| Identidad de la nueva versión en `/health` | No cumple el contrato nuevo | No cumple el contrato nuevo |
+
+La URL de suscripción consultada fue la API oficial y la clave permaneció únicamente
+en memoria del runner. HTTP 401 significa que la API central no acepta esa credencial;
+no permite concluir si está vencida, revocada o corresponde a otro servicio.
+El token de Railway sí es funcional y no necesita reemplazarse para acceder a estas tools.
+La inspección no cambia secretos ni crea volúmenes.
+
+Además, `/api/v1/console/tools` del core sigue devolviendo `url: null`, `healthUrl: null`
+y salud `unknown / sin desplegar` para ambas. Tener `/health` público no equivale a
+estar registrada y viva en el dashboard central.
+
+Siguiente preparación requerida: establecer la API URL oficial, conseguir que el dueño
+configure una clave central aceptada, preparar almacenamiento persistente para el cursor,
+desplegar los servicios nuevos y registrar sus URLs en el core. Después se podrá activar
+el consumidor con metas/contexto reales y verificar la cadena. Las modificaciones de
+servicios, variables, volúmenes y el despliegue no están incluidas en la autorización
+recibida para esta inspección.
+
 ## 1. Railway: servicios independientes
 
 Cada Dockerfile de `Docker/` ahora arranca `src/tool-server.js`, sin levantar otro
@@ -180,8 +217,9 @@ El registro central consultado marca compare `live` y track `pending`, pero amba
 URLs de tool/health son null. No basta con que `/health` de cpa responda 200.
 En el core configurar `PLATFORM_DOMAIN=orcalabs.mx` para resolver `subdomain: cpa`,
 o `TOOL_URL_COMPARE_PLANNED_VS_ACTUAL=https://cpa.orcalabs.mx`.
-Para track falta confirmar su dominio real y registrar `subdomain` o
-`TOOL_URL_TRACK_PROJECT_PROGRESS`. La URL también decide que el router delegue:
+Para track ya se verificó `https://tpp.orcalabs.mx/health`: falta registrar
+`subdomain: tpp` o `TOOL_URL_TRACK_PROJECT_PROGRESS=https://tpp.orcalabs.mx` en el core.
+La URL también decide que el router delegue:
 verificarla antes de activar un consumidor externo para evitar ejecución duplicada.
 Confirmar que las reglas posteriores siguen activas y no filtran la salida útil.
 El registro local ya declara ambas federadas y conserva track como `pending`;
@@ -189,10 +227,10 @@ estos cambios de catálogo no han sido aplicados al core desplegado.
 
 | Checklist | Evidencia local | Aceptación productiva pendiente |
 | --- | --- | --- |
-| Railway | Dockerfiles/config por servicio, imágenes construidas y arranque probado | Aplicar configuración/volumen y desplegar esta versión |
-| /health sin credenciales | HTTP 200 probado en ambas imágenes | Comprobar ambas URLs reales tras despliegue |
-| SSO abierto | Plantilla y pruebas de middleware aprobadas | Confirmar `/auth/me` de ambas versiones desplegadas |
-| URL y API key | HTTP central simulado con clave y rutas correctas | Validar clave central configurada en Railway |
+| Railway | Imágenes construidas y arranque probado; token funcional verificado por workflow | Aplicar configuración/volumen y desplegar esta versión |
+| /health sin credenciales | HTTP 200 probado en ambas imágenes y dominios publicados | Repetir tras desplegar la nueva versión |
+| SSO abierto | Plantilla y pruebas aprobadas; ambos dominios publicados muestran `mode: open` | Repetir tras desplegar la nueva versión |
+| URL y API key | URL ausente y clave rechazada con HTTP 401 en ambas tools, confirmado por workflow | Configurar URL oficial y clave aceptada |
 | Tool viva en dashboard | Configuración de registro identificada | Resolver URLs, health y estado de ambas |
 | Entrada y salida | Ciclos HTTP de ventas/proyecto y reintento probado | Evento real con metas/contexto confirmado |
 | Cadena completa | Correlación/causación y cursor probados | Revisar `/events/chain/<correlation_id>` y dashboard central |
