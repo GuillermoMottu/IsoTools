@@ -71,6 +71,8 @@ jobs:
 
       - name: Prepare tool runtime and persistent storage
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        env:
+          ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
         run: node scripts/prepare_railway_tool.js
 
       - name: Verify remote configuration and central API key
@@ -140,6 +142,8 @@ jobs:
 
       - name: Prepare tool runtime and persistent storage
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        env:
+          ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
         run: node scripts/prepare_railway_tool.js
 
       - name: Verify remote configuration and central API key

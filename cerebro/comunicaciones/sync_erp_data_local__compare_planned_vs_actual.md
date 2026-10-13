@@ -23,8 +23,11 @@ en el bus y sus IDs en `source`; publica `PRODUCTION_VARIANCE_DETECTED` con corr
 y causación del evento de entrada. La categoría del sobre es `productivity` (IES);
 `erp` sigue siendo la categoría del catálogo de la tool.
 
-Sin datos calculables, la tool conserva el cursor anterior, muestra `input_not_calculable`
-y espera la corrección de la meta/configuración. No publica una alerta falsa.
+Sin meta de ventas, la tool publica el valor real con `status: sin_meta`,
+`deviationPercent: null` y `details.planned: null`, como define `docs/ERP_CENTRAL.md`
+de upstream. No requiere inventar una organización para publicar ese hecho.
+Un dato ERP inválido o una meta configurada inválida conserva el cursor anterior;
+no se convierte en un caso `sin_meta` para saltar el error.
 El productor ERP local de esta rama no implementa todavía el cierre de ventas de upstream;
 la integración productiva depende del productor desplegado por el equipo de conexión.
 
@@ -32,3 +35,4 @@ la integración productiva depende del productor desplegado por el equipo de con
 
 - [2026-10-13] (codex) Registrada rule-conn-001 y consumo de cierre ERP. Agregado adaptador de ventas y consumidor federado con cursor durable, publicación idempotente y bloqueo explícito ante datos insuficientes.
 - [2026-10-13] (codex) Desplegado consumidor aislado en cpa.orcalabs.mx con SSO abierto y volumen persistente. Permanece pausado: clave central devuelve 401 y falta meta/organización real. Sin publicaciones productivas; registro y delegación del core pendientes. Evidencia y pasos de activación en docs/CHECKLIST_COMPARE_TRACK.md.
+- [2026-10-13] (codex) Corregida divergencia con upstream: la ausencia de meta en un cierre ERP válido publica el real con `sin_meta` y desviación null; ya no bloquea la suscripción. Conserva correlación, causación, cursor e idempotencia. Metas/datos inválidos siguen deteniendo el lote.

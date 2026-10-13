@@ -1,10 +1,30 @@
 import assert from 'node:assert/strict'
-import { runtimePlan } from './prepare_railway_tool.js'
+import { runtimePlan, configureCentralKey } from './prepare_railway_tool.js'
 import { deploymentConfigurationReady, stateDirectoryIsPersistent } from './inspect_railway_tool.js'
 import { deploymentIsCurrent } from './wait_tool_deployment.js'
 
 const tool = 'compare_planned_vs_actual'
 const service = 'compare-planned-vs-actual'
+const calls = []
+const variables = { ISOTOOLS_API_KEY: 'old-fixture-key' }
+const cli = (args, input) => { calls.push({ args, input }); return { success: true } }
+const acceptedKey = async (url, options) => {
+  assert.equal(options.method, undefined, 'key verification is GET only')
+  assert.equal(options.headers['x-api-key'], 'valid-fixture-key')
+  return new Response(JSON.stringify({ consumer: tool, consumes: ['ERP_SALES_PERIOD_CLOSED'], events: [] }))
+}
+assert.deepEqual(await configureCentralKey(variables, tool, service, 'valid-fixture-key', cli, acceptedKey), { supplied: true, changed: true })
+assert.equal(calls.length, 1)
+assert.equal(calls[0].input, 'valid-fixture-key')
+assert.ok(calls[0].args.includes('--stdin'))
+assert.ok(calls[0].args.every(arg => !arg.includes('valid-fixture-key')), 'key is not a command-line argument')
+assert.equal(variables.ISOTOOLS_API_KEY, 'valid-fixture-key')
+assert.deepEqual(await configureCentralKey(variables, tool, service, 'valid-fixture-key', cli, acceptedKey), { supplied: true, changed: false })
+assert.equal(calls.length, 1, 'matching key is preserved')
+await assert.rejects(configureCentralKey(variables, tool, service, 'invalid-fixture', cli, async () => new Response('{}', { status: 401 })), /supplied_central_key_rejected/)
+assert.equal(calls.length, 1, 'rejected key is never written')
+await assert.rejects(configureCentralKey({ ISOTOOLS_API_KEY: null }, tool, service, 'valid-fixture-key', cli, acceptedKey), /sealed_central_key_requires_review/)
+assert.deepEqual(await configureCentralKey(variables, tool, service, '', cli, acceptedKey), { supplied: false, changed: false })
 const serviceId = 'e3638694-09d1-4e56-9060-207657d62b89'
 const initial = runtimePlan(tool, service, { RAILWAY_SERVICE_ID: serviceId, ISOTOOLS_API_KEY: 'never-change-this-key' }, { volumes: [] })
 assert.equal(initial.createVolume, true)

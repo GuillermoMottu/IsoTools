@@ -85,8 +85,8 @@ export function deploymentConfigurationReady (report) {
     report.state_directory_persistent === true && Boolean(report.health_url)
 }
 
-export function railwayJson (args) {
-  return JSON.parse(execFileSync('railway', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 }))
+export function railwayJson (args, input) {
+  return JSON.parse(execFileSync('railway', args, { input, encoding: 'utf8', stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 }))
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

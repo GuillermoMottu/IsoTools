@@ -6,7 +6,28 @@ El usuario autorizó el 2026-10-13 completar las tareas propias, incluyendo publ
 en el fork y configurar/desplegar ambas tools mediante el workflow. El despliegue
 de esta versión está verificado; no se han publicado eventos reales.
 
-## Resultado del despliegue — 2026-10-13
+## Corrección de diagnóstico y contrato — 2026-10-13
+
+El usuario entregó la clave que generó y que el líder validó para `compare-track`.
+Probada directamente contra la API oficial: ambas suscripciones respondieron 200,
+con sus `consumer` y `consumes` correctos. La consulta limitada devolvió 0 eventos
+para compare y 1 para track. La clave es aceptada para lectura; no faltaba generar
+otra ni se demostró que el administrador hubiera omitido registrarla.
+
+El workflow recibe esa credencial desde el secreto de Actions `ISOTOOLS_API_KEY`,
+valida la suscripción y la aplica a cada servicio solo si difiere. Se transmite a
+la CLI por stdin, con `--skip-deploys`; no se imprime ni se añade al repositorio.
+Las claves selladas se conservan y requieren revisión. La aplicación/despliegue de
+esta corrección todavía está pendiente de la verificación final.
+
+Además, upstream documenta en `docs/ERP_CENTRAL.md` y la comunicación de cierre que
+la meta no viene del ERP. Se corrigió nuestra divergencia: un cierre válido sin meta
+publica `status: sin_meta`, valor real y desviaciones null, y avanza el cursor solo
+después del ACK. No exige inventar organización/meta para publicar ese hecho.
+Metas configuradas inválidas y eventos inválidos siguen bloqueando el lote.
+Track sigue requiriendo contexto real para emitir una alerta de proyecto.
+
+## Resultado del despliegue inicial — 2026-10-13
 
 Ambas tools sirven el commit `4e22663227591fa3e9a8ff4e6b9b1e17fb808521`.
 Track pasó en el [job de despliegue](https://github.com/GuillermoMottu/IsoTools/actions/runs/38479134828/job/115577122658)
@@ -18,7 +39,7 @@ El primer intento detectó que la CLI de volumen exige el ID del servicio: se co
 y probó. Al crear el volumen de compare, la consulta inmediata aún no lo mostraba;
 el reintento conservó ese mismo volumen, sin crear otro.
 
-| Comprobación actual | compare | track |
+| Comprobación del despliegue inicial | compare | track |
 | --- | --- | --- |
 | `/health` sin credenciales | [HTTP 200](https://cpa.orcalabs.mx/health), tool y SHA correctos | [HTTP 200](https://tpp.orcalabs.mx/health), tool y SHA correctos |
 | `/auth/me` | HTTP 200, `mode: open` | HTTP 200, `mode: open` |
@@ -37,15 +58,15 @@ El repositorio original y el core desplegado no se modificaron.
 
 ### Entrega pendiente de plataforma y datos
 
-1. **Plataforma:** configurar en cada servicio una `ISOTOOLS_API_KEY` aceptada para
-   consulta/publicación. El token de Railway funciona; el 401 corresponde a la API
-   de eventos. No se puede determinar su causa exacta solo con ese código.
+1. **Nuestra configuración:** aplicar la clave del usuario, ya aceptada para lectura,
+   y confirmar la aceptación desde Railway. La capacidad de publicar debe verificarse
+   con el evento real acordado; no se fabrica una publicación productiva para probarla.
 2. **Dueño del core:** registrar `TOOL_URL_COMPARE_PLANNED_VS_ACTUAL=https://cpa.orcalabs.mx`
    y `TOOL_URL_TRACK_PROJECT_PROGRESS=https://tpp.orcalabs.mx` y aplicar/recargar su
    configuración. El catálogo de esta rama ya declara subdominios y propietario.
    Confirmar delegación externa antes de activar los consumidores para evitar duplicados.
-3. **Dueño de los datos:** entregar organización y meta real de ventas por planta/periodo
-   para montar `business.json`; el mensaje ERP solo contiene el valor real. El productor
+3. **Dueño de los datos:** aportar organización y meta aprobada para una comparación
+   completa. Su ausencia no impide publicar el cierre ERP como `sin_meta`. El productor
    de KPIs debe aportar proyecto y contexto calculable a track (se detalla abajo).
 4. **Con esos insumos:** inspeccionar la clave, configurar los datos y activar
    `TOOL_CONSUMER_ENABLED=true` en cada servicio. Acordar un evento nuevo o cursor de
@@ -263,8 +284,10 @@ La respuesta real incluye `events` y `next_seq`; los eventos pueden ser filas pl
 ```
 
 No copiar el ejemplo sin sustituirlo: la configuración rechaza metas no numéricas,
-duplicadas o en otra unidad. Sin meta/organización calculable mantiene el cursor y
-expone `input_not_calculable`. `/analyses` devuelve las entradas adaptadas y
+duplicadas o en otra unidad. Sin meta publica el hecho ERP como `sin_meta`, con
+`details.actual` real, `details.planned: null` y desviaciones null; no fabrica una
+organización. Una meta configurada inválida conserva el cursor. Una comparación
+con meta pero contexto insuficiente expone `input_not_calculable`. `/analyses` devuelve las entradas adaptadas y
 `/api/tool/status` la última evaluación y publicación, con acceso según el modo SSO.
 La declaración y regla de conexión están incorporadas al catálogo local, pero el
 productor ERP de esta rama sigue siendo anterior al cierre de ventas de upstream.

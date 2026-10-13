@@ -10,6 +10,7 @@ assert.ok(toolEntry, 'compare_planned_vs_actual must be registered in tools.json
 assert.deepEqual(toolEntry.produces, ['PRODUCTION_VARIANCE_DETECTED'])
 assert.deepEqual(toolEntry.consumes, ['ERP_SALES_PERIOD_CLOSED'])
 assert.ok(toolEntry.outputSchema.properties.status.enum.includes('not_calculable'))
+assert.ok(toolEntry.outputSchema.properties.status.enum.includes('sin_meta'), 'ERP without a sales target remains publishable')
 assert.equal(toolEntry.outputSchema.properties.details.type, 'object')
 
 const kpiRule = rules.rules.find(rule => rule.id === 'rule-pkg-008')

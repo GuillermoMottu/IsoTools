@@ -128,7 +128,20 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
         const event = subscriptionEvent(row, contract.consumes)
         const config = businessConfigFile ? JSON.parse(await readFile(businessConfigFile, 'utf8')) : {}
         const input = toolId === 'compare_planned_vs_actual' ? salesInput(event, config) : event.data
-        const result = contract.evaluate({ ...event, data: input })
+        let result = contract.evaluate({ ...event, data: input })
+        // ERP_CENTRAL: an absent sales target must publish the actual, not stall the subscription.
+        if (toolId === 'compare_planned_vs_actual' && !Array.isArray(event.data.metrics) && input.metrics[0].planned === null) {
+          result = {
+            ...result, module: 'sales', status: 'sin_meta',
+            summary: 'Ventas reales recibidas; no hay meta aprobada para comparar.',
+            deviation_percent: null, deviationPercent: null, weighted_deviation_percent: null,
+            details: {
+              planned: null, actual: event.data.actual, unit: event.data.unit,
+              metrics: [{ ...input.metrics[0], status: 'sin_meta', variance: null, variance_percent: null, adverse_percent: null }]
+            },
+            recommended_actions: ['define_sales_target']
+          }
+        }
         const id = input.analysis_id || input.analysisId || input.project_id || input.projectId
         if (id) state.records[id] = { ...input, [toolId === 'compare_planned_vs_actual' ? 'analysis_id' : 'project_id']: id }
         state.last_evaluation = { event_id: event.event_id, result }

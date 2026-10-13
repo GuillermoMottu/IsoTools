@@ -719,7 +719,8 @@
             "on_track",
             "deviation",
             "critical",
-            "not_calculable"
+            "not_calculable",
+            "sin_meta"
           ]
         },
         "severity": {
