@@ -31,3 +31,4 @@ la integración productiva depende del productor desplegado por el equipo de con
 ## Bitácora de la comunicación
 
 - [2026-10-13] (codex) Registrada rule-conn-001 y consumo de cierre ERP. Agregado adaptador de ventas y consumidor federado con cursor durable, publicación idempotente y bloqueo explícito ante datos insuficientes.
+- [2026-10-13] (codex) Desplegado consumidor aislado en cpa.orcalabs.mx con SSO abierto y volumen persistente. Permanece pausado: clave central devuelve 401 y falta meta/organización real. Sin publicaciones productivas; registro y delegación del core pendientes. Evidencia y pasos de activación en docs/CHECKLIST_COMPARE_TRACK.md.

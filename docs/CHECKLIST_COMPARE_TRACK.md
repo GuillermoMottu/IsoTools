@@ -1,12 +1,64 @@
-# Preparación del checklist de compare y track
+# Checklist de compare y track
 
-Trabajo local en `comm/sync_erp_data_local__compare_planned_vs_actual`.
+Trabajo publicado en el fork, rama `comm/sync_erp_data_local__compare_planned_vs_actual`.
 Este documento distingue lo probado localmente de la aceptación en Railway.
 El usuario autorizó el 2026-10-13 completar las tareas propias, incluyendo publicar
 en el fork y configurar/desplegar ambas tools mediante el workflow. El despliegue
-de esta versión está pendiente de verificación; no se han publicado eventos reales.
+de esta versión está verificado; no se han publicado eventos reales.
 
-## Resultado de inspección con el token del workflow — 2026-10-13
+## Resultado del despliegue — 2026-10-13
+
+Ambas tools sirven el commit `4e22663227591fa3e9a8ff4e6b9b1e17fb808521`.
+Track pasó en el [job de despliegue](https://github.com/GuillermoMottu/IsoTools/actions/runs/38479134828/job/115577122658)
+y compare en el [run posterior](https://github.com/GuillermoMottu/IsoTools/actions/runs/38479300211).
+La [inspección final conjunta](https://github.com/GuillermoMottu/IsoTools/actions/runs/38479515797)
+pasó en ambas: URL oficial, volumen `/data`, identidad, SHA y SSO abierto confirmados;
+la clave central permanece rechazada con 401 y los consumidores deshabilitados.
+El primer intento detectó que la CLI de volumen exige el ID del servicio: se corrigió
+y probó. Al crear el volumen de compare, la consulta inmediata aún no lo mostraba;
+el reintento conservó ese mismo volumen, sin crear otro.
+
+| Comprobación actual | compare | track |
+| --- | --- | --- |
+| `/health` sin credenciales | [HTTP 200](https://cpa.orcalabs.mx/health), tool y SHA correctos | [HTTP 200](https://tpp.orcalabs.mx/health), tool y SHA correctos |
+| `/auth/me` | HTTP 200, `mode: open` | HTTP 200, `mode: open` |
+| Interfaz en navegador | Carga; 0 análisis reales | Carga; 0 proyectos reales |
+| `ISOTOOLS_API_URL` | URL oficial configurada | URL oficial configurada |
+| `ISOTOOLS_API_KEY` | Conservada; la API central devuelve 401 | Conservada; la API central devuelve 401 |
+| Estado en volumen persistente | `/data`, confirmado por workflow | `/data`, confirmado por workflow |
+| `/ready` | 503, `consumer_disabled` | 503, `consumer_disabled` |
+| `/api/tool/status` | Cursor null, sin publicaciones pendientes ni registros | Cursor null, sin publicaciones pendientes ni registros |
+
+La salud comprueba el proceso, identidad y escritura inicial del estado. El consumidor
+está pausado por los bloqueos de integración; no se presenta como listo para eventos.
+La persistencia se comprobó por montaje y escritura en producción y con reinicio/reintento
+en pruebas locales. No se inyectaron datos ficticios para probar el volumen productivo.
+El repositorio original y el core desplegado no se modificaron.
+
+### Entrega pendiente de plataforma y datos
+
+1. **Plataforma:** configurar en cada servicio una `ISOTOOLS_API_KEY` aceptada para
+   consulta/publicación. El token de Railway funciona; el 401 corresponde a la API
+   de eventos. No se puede determinar su causa exacta solo con ese código.
+2. **Dueño del core:** registrar `TOOL_URL_COMPARE_PLANNED_VS_ACTUAL=https://cpa.orcalabs.mx`
+   y `TOOL_URL_TRACK_PROJECT_PROGRESS=https://tpp.orcalabs.mx` y aplicar/recargar su
+   configuración. El catálogo de esta rama ya declara subdominios y propietario.
+   Confirmar delegación externa antes de activar los consumidores para evitar duplicados.
+3. **Dueño de los datos:** entregar organización y meta real de ventas por planta/periodo
+   para montar `business.json`; el mensaje ERP solo contiene el valor real. El productor
+   de KPIs debe aportar proyecto y contexto calculable a track (se detalla abajo).
+4. **Con esos insumos:** inspeccionar la clave, configurar los datos y activar
+   `TOOL_CONSUMER_ENABLED=true` en cada servicio. Acordar un evento nuevo o cursor de
+   repetición explícito, comprobar entrada/salida y revisar su cadena en el dashboard.
+   No se activa automáticamente ni se reproducen históricos para forzar una demostración.
+
+El GET final al registro central devolvió ambas `url: null`, `healthUrl: null`,
+`health.state: unknown / sin desplegar`; compare figura `live` y track `pending` en
+ese core anterior. Este es el pendiente que explica la discrepancia con Railway.
+SSO con IdP y reutilización de sesión entre tools requiere las credenciales posteriores
+del líder; para la fase actual ya se cumple la plantilla en modo abierto.
+
+## Inspección inicial anterior al despliegue — 2026-10-13
 
 Se publicaron únicamente el workflow, el inspector, su prueba y este documento en
 el fork `GuillermoMottu/IsoTools`, rama `comm/sync_erp_data_local__compare_planned_vs_actual`.
@@ -246,15 +298,15 @@ Para track ya se verificó `https://tpp.orcalabs.mx/health`: falta registrar
 La URL también decide que el router delegue:
 verificarla antes de activar un consumidor externo para evitar ejecución duplicada.
 Confirmar que las reglas posteriores siguen activas y no filtran la salida útil.
-El registro local ya declara ambas federadas y conserva track como `pending`;
-estos cambios de catálogo no han sido aplicados al core desplegado.
+El registro local ya declara ambas federadas y desplegadas; estos cambios de catálogo
+no han sido aplicados al core desplegado.
 
-| Checklist | Evidencia local | Aceptación productiva pendiente |
+| Checklist | Evidencia comprobada | Pendiente |
 | --- | --- | --- |
-| Railway | Imágenes construidas y arranque probado; token funcional verificado por workflow | Aplicar configuración/volumen y desplegar esta versión |
-| /health sin credenciales | HTTP 200 probado en ambas imágenes y dominios publicados | Repetir tras desplegar la nueva versión |
-| SSO abierto | Plantilla y pruebas aprobadas; ambos dominios publicados muestran `mode: open` | Repetir tras desplegar la nueva versión |
-| URL y API key | URL ausente y clave rechazada con HTTP 401 en ambas tools, confirmado por workflow | Configurar URL oficial y clave aceptada |
+| Railway | Ambas versiones nuevas desplegadas y volumen confirmado | Ninguno para el proceso pausado |
+| /health sin credenciales | HTTP 200, tool y SHA correctos en ambos dominios | Ninguno |
+| SSO abierto | Plantilla y pruebas aprobadas; ambas versiones muestran `mode: open` | IdP real en la fase posterior |
+| URL y API key | URL oficial configurada; clave central rechazada con HTTP 401 | Clave aceptada, permisos de publicación |
 | Tool viva en dashboard | Configuración de registro identificada | Resolver URLs, health y estado de ambas |
 | Entrada y salida | Ciclos HTTP de ventas/proyecto y reintento probado | Evento real con metas/contexto confirmado |
 | Cadena completa | Correlación/causación y cursor probados | Revisar `/events/chain/<correlation_id>` y dashboard central |
