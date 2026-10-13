@@ -81,9 +81,9 @@
     { "toolId": "calculate_cpk_ppk", "kind": "native", "status": "live", "isoClause": "9.1.3" },
     { "toolId": "run_msa_analysis", "kind": "native", "status": "live", "isoClause": "7.1.5.2" },
     { "toolId": "detect_business_anomalies", "kind": "native", "status": "live", "isoClause": "9.1.3" },
-    { "toolId": "compare_planned_vs_actual", "kind": "federated", "status": "live", "subdomain": "cpa", "localPort": 8106, "owner": "Guillermo Mottu", "isoClause": "9.1.1", "note": "Version aislada desplegada y /health verificado el 2026-10-13. Consumidor pausado: falta clave central aceptada y metas reales. Configurar PLATFORM_DOMAIN o TOOL_URL_COMPARE_PLANNED_VS_ACTUAL en el core antes de activar la delegacion." },
+    { "toolId": "compare_planned_vs_actual", "kind": "federated", "status": "live", "subdomain": "cpa", "localPort": 8106, "owner": "Guillermo Mottu", "isoClause": "9.1.1", "note": "Version aislada desplegada, /health 200 y clave central aceptada el 2026-10-13. Sin meta publica el real como sin_meta. Consumidor pausado: coordinar registro/delegacion en el core antes de activar. La comparacion completa requiere meta aprobada y contexto." },
     { "toolId": "generate_kpis", "kind": "native", "status": "live", "isoClause": "9.1.1" },
-    { "toolId": "track_project_progress", "kind": "federated", "status": "live", "subdomain": "tpp", "owner": "Guillermo Mottu", "isoClause": "6.2", "note": "Version aislada desplegada en tpp.orcalabs.mx y /health verificado el 2026-10-13. Consumidor pausado: falta clave central aceptada y contexto real de proyectos. Coordinar registro en el core antes de activar; salud HTTP no acredita la cadena funcional." },
+    { "toolId": "track_project_progress", "kind": "federated", "status": "live", "subdomain": "tpp", "owner": "Guillermo Mottu", "isoClause": "6.2", "note": "Version aislada desplegada en tpp.orcalabs.mx, /health 200 y clave central aceptada el 2026-10-13. Consumidor pausado: el KPI consultado no trae contexto calculable de proyecto. Coordinar registro en el core y contexto antes de activar; salud HTTP no acredita la cadena funcional." },
     { "toolId": "automate_followups", "kind": "native", "status": "live", "isoClause": "10.2" }
   ]
 }

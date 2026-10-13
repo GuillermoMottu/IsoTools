@@ -17,8 +17,17 @@ otra ni se demostró que el administrador hubiera omitido registrarla.
 El workflow recibe esa credencial desde el secreto de Actions `ISOTOOLS_API_KEY`,
 valida la suscripción y la aplica a cada servicio solo si difiere. Se transmite a
 la CLI por stdin, con `--skip-deploys`; no se imprime ni se añade al repositorio.
-Las claves selladas se conservan y requieren revisión. La aplicación/despliegue de
-esta corrección todavía está pendiente de la verificación final.
+Las claves selladas se conservan y requieren revisión.
+El [despliegue correctivo 38483520741](https://github.com/GuillermoMottu/IsoTools/actions/runs/38483520741)
+pasó en ambas tools. Los indicadores `central_key_changed: true` y
+`supplied_central_key_verified: true` confirman que la clave anterior era distinta
+de la entregada por el usuario; se sustituyó y el GET central desde Railway pasó
+de 401 a 200. No era necesario generar una nueva clave ni cambiar el registro central.
+
+Estado actual: ambas sirven `d6b6a2b533d316656218198990cbbcc1eb67ad33`, `/health` 200,
+SSO abierto, API URL oficial, clave aceptada para lectura y volumen `/data` conservado.
+Los consumidores siguen deshabilitados, `/ready` 503 `consumer_disabled`, cursor null,
+sin publicaciones pendientes ni registros. No se publicaron eventos productivos.
 
 Además, upstream documenta en `docs/ERP_CENTRAL.md` y la comunicación de cierre que
 la meta no viene del ERP. Se corrigió nuestra divergencia: un cierre válido sin meta
@@ -26,6 +35,10 @@ publica `status: sin_meta`, valor real y desviaciones null, y avanza el cursor s
 después del ACK. No exige inventar organización/meta para publicar ese hecho.
 Metas configuradas inválidas y eventos inválidos siguen bloqueando el lote.
 Track sigue requiriendo contexto real para emitir una alerta de proyecto.
+Se revisó por GET el evento disponible en la suscripción de track: `data` contiene
+solo `kpis`, `period`, `plantId`. El evaluador confirmó `not_calculable` por ausencia
+de organización, ID/nombre de proyecto, fecha de evaluación, inicio/fin planificados
+y porcentajes planificado/real. Esta carencia se comprobó en el evento recibido.
 
 ## Resultado del despliegue inicial — 2026-10-13
 
@@ -58,20 +71,19 @@ El repositorio original y el core desplegado no se modificaron.
 
 ### Entrega pendiente de plataforma y datos
 
-1. **Nuestra configuración:** aplicar la clave del usuario, ya aceptada para lectura,
-   y confirmar la aceptación desde Railway. La capacidad de publicar debe verificarse
-   con el evento real acordado; no se fabrica una publicación productiva para probarla.
-2. **Dueño del core:** registrar `TOOL_URL_COMPARE_PLANNED_VS_ACTUAL=https://cpa.orcalabs.mx`
+1. **Dueño del core:** registrar `TOOL_URL_COMPARE_PLANNED_VS_ACTUAL=https://cpa.orcalabs.mx`
    y `TOOL_URL_TRACK_PROJECT_PROGRESS=https://tpp.orcalabs.mx` y aplicar/recargar su
    configuración. El catálogo de esta rama ya declara subdominios y propietario.
    Confirmar delegación externa antes de activar los consumidores para evitar duplicados.
-3. **Dueño de los datos:** aportar organización y meta aprobada para una comparación
+2. **Dueño de los datos:** aportar organización y meta aprobada para una comparación
    completa. Su ausencia no impide publicar el cierre ERP como `sin_meta`. El productor
    de KPIs debe aportar proyecto y contexto calculable a track (se detalla abajo).
-4. **Con esos insumos:** inspeccionar la clave, configurar los datos y activar
+3. **Con esos insumos:** configurar los datos y activar
    `TOOL_CONSUMER_ENABLED=true` en cada servicio. Acordar un evento nuevo o cursor de
    repetición explícito, comprobar entrada/salida y revisar su cadena en el dashboard.
    No se activa automáticamente ni se reproducen históricos para forzar una demostración.
+   La clave ya funciona para lectura; la publicación se verificará con el evento
+   real acordado, sin fabricar una prueba productiva.
 
 El GET final al registro central devolvió ambas `url: null`, `healthUrl: null`,
 `health.state: unknown / sin desplegar`; compare figura `live` y track `pending` en
@@ -329,7 +341,7 @@ no han sido aplicados al core desplegado.
 | Railway | Ambas versiones nuevas desplegadas y volumen confirmado | Ninguno para el proceso pausado |
 | /health sin credenciales | HTTP 200, tool y SHA correctos en ambos dominios | Ninguno |
 | SSO abierto | Plantilla y pruebas aprobadas; ambas versiones muestran `mode: open` | IdP real en la fase posterior |
-| URL y API key | URL oficial configurada; clave central rechazada con HTTP 401 | Clave aceptada, permisos de publicación |
+| URL y API key | URL oficial y clave del usuario configuradas; GET central 200 en ambas | Confirmar publicación con evento real acordado |
 | Tool viva en dashboard | Configuración de registro identificada | Resolver URLs, health y estado de ambas |
 | Entrada y salida | Ciclos HTTP de ventas/proyecto y reintento probado | Evento real con metas/contexto confirmado |
 | Cadena completa | Correlación/causación y cursor probados | Revisar `/events/chain/<correlation_id>` y dashboard central |
