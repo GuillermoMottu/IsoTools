@@ -34,6 +34,26 @@ Además, `/api/v1/console/tools` del core sigue devolviendo `url: null`, `health
 y salud `unknown / sin desplegar` para ambas. Tener `/health` público no equivale a
 estar registrada y viva en el dashboard central.
 
+Las páginas de aceptación del dashboard indicadas por el usuario son:
+
+- [compare_planned_vs_actual](https://api-events.orcalabs.mx/herramientas/compare_planned_vs_actual)
+- [track_project_progress](https://api-events.orcalabs.mx/herramientas/track_project_progress)
+
+Revisadas en el navegador el 2026-10-13: ambas muestran modo `federada`, estado y
+URL `sin desplegar`, responsable `pendiente de asignar` y SSO desactivado. Los
+contratos visibles coinciden con los eventos acordados: compare consume
+`ERP_SALES_PERIOD_CLOSED` y publica `PRODUCTION_VARIANCE_DETECTED`; track consume
+`KPI_REPORT_GENERATED` y publica `PROJECT_AT_RISK`.
+
+Cada página muestra dos publicaciones de su tool del 2026-07-23, asociadas a las
+mismas dos cadenas históricas. La [cadena revisada](https://api-events.orcalabs.mx/eventos/cadena/f140073c-d6a8-49cd-bc4c-5a89d37e0395)
+contiene ocho pasos: empieza en `PRODUCTION_VARIANCE_DETECTED`, incluye KPIs y
+`PROJECT_AT_RISK`, y termina con registros `FOLLOWUP_SCHEDULED` de julio/agosto.
+No contiene la entrada `ERP_SALES_PERIOD_CLOSED`. Es evidencia histórica de
+publicaciones y trazabilidad, no de la recepción del cierre ERP ni del consumidor
+federado nuevo. Para aceptar el checklist debe aparecer una cadena nueva con la
+entrada ERP y su correlación conservada, además de las URLs resueltas y salud actual.
+
 Siguiente preparación requerida: establecer la API URL oficial, conseguir que el dueño
 configure una clave central aceptada, preparar almacenamiento persistente para el cursor,
 desplegar los servicios nuevos y registrar sus URLs en el core. Después se podrá activar
