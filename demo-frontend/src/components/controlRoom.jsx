@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { healthResponseIsOnline } from '../displayValues.js'
+import { cloneElement, isValidElement, useId, useEffect, useState } from 'react'
 import { AlertTriangle, ArrowLeft, Loader2, LogOut } from 'lucide-react'
 
 export function AppShell ({
@@ -19,9 +20,9 @@ export function AppShell ({
       <header className="app-topbar">
         <div className="app-topbar-inner">
           {dashboardUrl ? (
-            <a className="back-link" href={dashboardUrl} title="Volver al dashboard">
+            <a className="back-link" href={dashboardUrl} title="Volver al inicio">
               <ArrowLeft size={16} aria-hidden="true" />
-              <span className="sr-only">Volver al dashboard</span>
+              <span className="sr-only">Volver al inicio</span>
             </a>
           ) : null}
           {icon ? <span className="tool-icon">{icon}</span> : null}
@@ -36,7 +37,7 @@ export function AppShell ({
       </header>
 
       {online === false ? (
-        <div className="service-alert">El servicio no responde. Las acciones fallaran hasta que vuelva.</div>
+        <div className="service-alert">El servicio no responde. La información se actualizará cuando se restablezca la conexión.</div>
       ) : null}
 
       <main className="app-main">{children}</main>
@@ -51,8 +52,9 @@ function useHealth (path) {
     let alive = true
     const ping = () => {
       fetch(path, { credentials: 'include' })
-        .then(response => {
-          if (alive) setOnline(response.ok)
+        .then(healthResponseIsOnline)
+        .then(healthy => {
+          if (alive) setOnline(healthy)
         })
         .catch(() => {
           if (alive) setOnline(false)
@@ -93,7 +95,7 @@ function useSession (path) {
 }
 
 function HealthChip ({ online }) {
-  const label = online === null ? 'conectando' : online ? 'en linea' : 'sin respuesta'
+  const label = online === null ? 'conectando' : online ? 'en línea' : 'sin respuesta'
   const tone = online === null ? 'neutral' : online ? 'ok' : 'danger'
   return <StatusChip status={label} tone={tone} />
 }
@@ -102,14 +104,14 @@ function SessionChip ({ session }) {
   if (!session) return null
   if (!session.authenticated) {
     if (session.mode !== 'open') return null
-    return <Badge tone="warn">SSO desactivado - desarrollo</Badge>
+    return <Badge tone="warn">Entorno de demostración</Badge>
   }
 
   const user = session.user || {}
   return (
     <span className="session-chip">
-      <span>{user.displayName || 'sesion'}</span>
-      <Mono>{user.role || 'sin rol'}</Mono>
+      <span>{user.displayName || 'Sesión'}</span>
+      <Mono>{{ 'platform.admin': 'Administrador de plataforma', 'platform.auditor': 'Auditor', 'quality.director': 'Director de calidad', 'quality.technical-authority': 'Autoridad técnica', 'quality.manager': 'Gerente de calidad', 'quality.engineer': 'Ingeniero de calidad', 'maintenance.manager': 'Gerente de mantenimiento', 'maintenance.technician': 'Técnico de mantenimiento', 'operations.manager': 'Gerente de operaciones', operator: 'Operador' }[user.role] || 'Rol no disponible'}</Mono>
       <a href="/auth/logout" title="Cerrar sesion">
         <LogOut size={14} aria-hidden="true" />
         <span className="sr-only">Cerrar sesion</span>
@@ -193,20 +195,26 @@ export function Button ({ variant = 'ghost', loading = false, disabled, children
 }
 
 export function Field ({ label, hint, error, required, children }) {
+  const id = useId()
+  const control = isValidElement(children) && children.type !== 'div'
+    ? cloneElement(children, { id, 'aria-invalid': error ? true : undefined, 'aria-describedby': error || hint ? `${id}-help` : undefined })
+    : children
   return (
     <label className="field">
       <span>
         {label}
         {required ? <b aria-hidden="true"> *</b> : null}
       </span>
-      {children}
-      {error ? <small className="field-error">{error}</small> : hint ? <small>{hint}</small> : null}
+      {control}
+      {error ? <small id={`${id}-help`} className="field-error">{error}</small> : hint ? <small id={`${id}-help`}>{hint}</small> : null}
     </label>
   )
 }
 
-export function Input ({ className = '', ...props }) {
-  return <input {...props} className={`input ${className}`} />
+export function Input ({ className = '', error, ...props }) {
+  const id = useId()
+  if (!error) return <input {...props} className={`input ${className}`} />
+  return <span className="cell-input"><input {...props} className={`input ${className}`} aria-invalid="true" aria-describedby={`${id}-error`} /><small id={`${id}-error`} className="field-error">{error}</small></span>
 }
 
 export function Table ({ columns, rows, getRowKey, empty }) {
@@ -239,7 +247,7 @@ export function Mono ({ children, className = '' }) {
 
 export function Loading ({ label = 'Cargando' }) {
   return (
-    <div className="state-box">
+    <div className="state-box" role="status">
       <Loader2 className="spin" size={16} aria-hidden="true" />
       <span>{label}</span>
     </div>
@@ -248,7 +256,7 @@ export function Loading ({ label = 'Cargando' }) {
 
 export function ErrorState ({ title, detail }) {
   return (
-    <div className="error-state">
+    <div className="error-state" role="alert">
       <AlertTriangle size={16} aria-hidden="true" />
       <div>
         <p>{title}</p>
@@ -268,9 +276,9 @@ export function EmptyState ({ title, detail }) {
 }
 
 export function formatTime (value) {
-  if (!value) return 'N/D'
+  if (!value) return 'No disponible'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'N/D'
+  if (Number.isNaN(date.getTime())) return 'No disponible'
   return new Intl.DateTimeFormat('es-MX', {
     day: '2-digit',
     month: '2-digit',

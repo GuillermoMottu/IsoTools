@@ -496,7 +496,8 @@
             "quality",
             "cost",
             "schedule",
-            "service"
+            "service",
+            "sales"
           ]
         },
         "module": {
@@ -504,7 +505,8 @@
           "enum": [
             "production",
             "purchasing",
-            "costs"
+            "costs",
+            "sales"
           ]
         },
         "periodStart": {
@@ -778,7 +780,7 @@
     "produces": [
       "PRODUCTION_VARIANCE_DETECTED"
     ],
-    "consumes": []
+    "consumes": ["ERP_SALES_PERIOD_CLOSED"]
   },
   {
     "id": "detect_production_deviation",

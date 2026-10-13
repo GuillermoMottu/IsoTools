@@ -69,6 +69,10 @@ jobs:
       - name: Install Railway CLI
         run: npm i -g @railway/cli@5.67.1
 
+      - name: Prepare tool runtime and persistent storage
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: node scripts/prepare_railway_tool.js
+
       - name: Verify remote configuration and central API key
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/inspect_railway_tool.js --require-deploy-config
@@ -87,18 +91,7 @@ jobs:
 
       - name: Smoke health
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
-        run: |
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
-            if [ "$code" = "200" ]; then
-              echo "OK: health returned 200 on attempt $i"
-              exit 0
-            fi
-            echo "attempt $i/30: HTTP $code; retrying in 10s"
-            sleep 10
-          done
-          echo "::error::health URL did not return 200 after 5 minutes."
-          exit 1
+        run: node scripts/wait_tool_deployment.js
 
       - name: Verify deployed tool identity and open SSO
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
@@ -145,6 +138,10 @@ jobs:
       - name: Install Railway CLI
         run: npm i -g @railway/cli@5.67.1
 
+      - name: Prepare tool runtime and persistent storage
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: node scripts/prepare_railway_tool.js
+
       - name: Verify remote configuration and central API key
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/inspect_railway_tool.js --require-deploy-config
@@ -163,18 +160,7 @@ jobs:
 
       - name: Smoke health
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
-        run: |
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
-            if [ "$code" = "200" ]; then
-              echo "OK: health returned 200 on attempt $i"
-              exit 0
-            fi
-            echo "attempt $i/30: HTTP $code; retrying in 10s"
-            sleep 10
-          done
-          echo "::error::health URL did not return 200 after 5 minutes."
-          exit 1
+        run: node scripts/wait_tool_deployment.js
 
       - name: Verify deployed tool identity and open SSO
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}

@@ -266,26 +266,6 @@ function clone (value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function mergeDeep (base, override) {
-  if (!override || typeof override !== 'object' || Array.isArray(override)) return clone(base)
-  const output = clone(base)
-  for (const [key, value] of Object.entries(override)) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      output[key] &&
-      typeof output[key] === 'object' &&
-      !Array.isArray(output[key])
-    ) {
-      output[key] = mergeDeep(output[key], value)
-    } else {
-      output[key] = value
-    }
-  }
-  return output
-}
-
 function demoEvent (moduleId, asset, type, category, severity, data) {
   return {
     event_id: randomUUID(),
@@ -343,7 +323,7 @@ function scenarioDefaults (scenario) {
 
 export function runComparePlannedVsActualTool (payload = {}) {
   const { scenario, defaults } = scenarioDefaults(payload.scenario)
-  const compareData = mergeDeep(defaults.compare, payload.input || payload.compare)
+  const compareData = clone(Object.hasOwn(payload, 'input') || Object.hasOwn(payload, 'compare') ? payload.input || payload.compare || {} : defaults.compare)
 
   const compareInputEvent = demoEvent(
     compareMeta.id,
@@ -369,7 +349,7 @@ export function runComparePlannedVsActualTool (payload = {}) {
 
 export function runTrackProjectProgressTool (payload = {}) {
   const { scenario, defaults } = scenarioDefaults(payload.scenario)
-  const projectData = mergeDeep(defaults.project, payload.input || payload.project)
+  const projectData = clone(Object.hasOwn(payload, 'input') || Object.hasOwn(payload, 'project') ? payload.input || payload.project || {} : defaults.project)
 
   const projectInputEvent = demoEvent(
     'generate_kpis',

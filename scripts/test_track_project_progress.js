@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { handler } from '../src/tools/track_project_progress.js'
+import { handler, evaluateProjectProgress } from '../src/tools/track_project_progress.js'
 
 const tools = JSON.parse(readFileSync('src/data/agents/tools.json', 'utf8'))
 const rules = JSON.parse(readFileSync('src/data/agents/communication-rules.json', 'utf8'))
@@ -143,4 +143,23 @@ assert.equal(legacyCamelInput.data.status, 'at_risk')
 assert.equal(legacyCamelInput.data.targetType, 'supplier')
 assert.deepEqual(legacyCamelInput.data.targetIds, ['SUP-001'])
 
+for (const milestones of [[null], [42], [[]], ['bad'], {}]) {
+  assert.equal(run(baseInput({ milestones })), null)
+}
+for (const thresholds of [null, [], false, { at_risk_delay_percent: -1 }, { at_risk_delay_percent: '5' }, { at_risk_delay_percent: null }, { at_risk_delay_percent: Infinity }, { at_risk_delay_percent: NaN }, { at_risk_delay_percent: 20, delayed_percent: 10 }]) {
+  const data = baseInput({ thresholds })
+  assert.equal(run(data), null)
+  const result = evaluateProjectProgress({ ...baseEvent, data })
+  assert.equal(result.status, 'not_calculable')
+  assert.equal(result.audit.thresholds_applied, null)
+  assert.ok(result.data_quality.warnings.some(warning => warning.includes('thresholds')))
+}
+for (const thresholds of [{ at_risk_delay_percent: 0, delayed_percent: 0 }, { atRiskDelayPercent: 0, delayedPercent: 0 }]) {
+  assert.equal(run(baseInput({ thresholds })).data.status, 'delayed')
+}
+for (const actual_amount of ['', null, false, [], -1, Infinity]) {
+  const result = evaluateProjectProgress({ ...baseEvent, data: baseInput({ budget: { planned_amount: 1000, actual_amount } }) })
+  assert.equal(result.budgetUsedPercent, null)
+  assert.ok(result.data_quality.warnings.some(warning => warning.includes('budget')))
+}
 console.log('track_project_progress smoke OK')

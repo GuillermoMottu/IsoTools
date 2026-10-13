@@ -58,6 +58,7 @@ export async function inspectConnection (variables, toolId, configuredHealthUrl 
       if (response.ok) {
         const health = await response.json()
         report.deployed_tool_identity_matches = health.tool === toolId
+        report.deployed_build_sha = /^[a-f0-9]{40}$/.test(health.build_sha || '') ? health.build_sha : null
       }
       const session = await fetcher(new URL('/auth/me', report.health_url).href, { redirect: 'error', signal: AbortSignal.timeout(15000) })
       report.deployed_auth_mode_open = session.ok && (await session.json()).mode === 'open'
@@ -66,9 +67,26 @@ export async function inspectConnection (variables, toolId, configuredHealthUrl 
   return report
 }
 
-export function hasDataVolume (volumeList, service) {
+export function stateDirectoryIsPersistent (volumeList, service, stateDirectory = '/data') {
   if (!Array.isArray(volumeList.volumes)) throw new Error('invalid_volume_response')
-  return volumeList.volumes.some(volume => volume.serviceName === service && volume.mountPath === '/data' && !volume.isPendingDeletion && !volume.deletedAt)
+  return volumeList.volumes.some(volume => volume.serviceName === service && !volume.isPendingDeletion && !volume.deletedAt &&
+    typeof volume.mountPath === 'string' && volume.mountPath !== '/' &&
+    (stateDirectory === volume.mountPath || stateDirectory.startsWith(`${volume.mountPath}/`)))
+}
+
+export function hasDataVolume (volumeList, service) {
+  return stateDirectoryIsPersistent(volumeList, service, '/data')
+}
+
+export function deploymentConfigurationReady (report) {
+  // Railway-first deployment is allowed while paused; an active worker must have a valid central key.
+  return report.api_url_matches && (!report.consumer_enabled || report.central_api_key_works === true) &&
+    report.tool_id_matches && report.dockerfile_matches && report.open_mode_configured &&
+    report.state_directory_persistent === true && Boolean(report.health_url)
+}
+
+export function railwayJson (args) {
+  return JSON.parse(execFileSync('railway', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 }))
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -77,19 +95,20 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     let variables
     try {
       // CLI JSON contains secrets. Capture it in memory and never print raw stdout/stderr.
-      variables = JSON.parse(execFileSync('railway', ['variable', 'list', '--service', process.env.RAILWAY_SERVICE, '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 }))
+      variables = railwayJson(['variable', 'list', '--service', process.env.RAILWAY_SERVICE, '--json'])
     } catch { throw new Error('railway_variables_query_failed') }
     const report = await inspectConnection(variables, process.env.TOOL_PAGE_ID, process.env.HEALTH_URL)
     try {
-      const volumeList = JSON.parse(execFileSync('railway', ['volume', '--service', process.env.RAILWAY_SERVICE, 'list', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 }))
+      const volumeList = railwayJson(['volume', '--service', process.env.RAILWAY_SERVICE, 'list', '--json'])
       report.volume_mounted_at_data = hasDataVolume(volumeList, process.env.RAILWAY_SERVICE)
+      report.state_directory_persistent = stateDirectoryIsPersistent(volumeList, process.env.RAILWAY_SERVICE, variables.TOOL_STATE_DIR || '/data')
       report.volume_query_succeeded = true
     } catch { report.volume_query_succeeded = false }
     console.log(JSON.stringify(report, null, 2))
     if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### ${report.tool}\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`)
     if (report.health_url && process.env.GITHUB_ENV) await appendFile(process.env.GITHUB_ENV, `HEALTH_URL=${report.health_url}\n`)
-    if (process.argv.includes('--require-deploy-config') && (!report.api_url_matches || !report.central_api_key_works || !report.tool_id_matches || !report.dockerfile_matches || !report.open_mode_configured || !report.volume_mounted_at_data || !report.state_path_matches || !report.health_url)) throw new Error('deployment_configuration_incomplete')
-    if (process.argv.includes('--require-deployed-tool') && (!report.deployed_tool_identity_matches || !report.deployed_auth_mode_open)) throw new Error('deployed_tool_verification_failed')
+    if (process.argv.includes('--require-deploy-config') && !deploymentConfigurationReady(report)) throw new Error('deployment_configuration_incomplete')
+    if (process.argv.includes('--require-deployed-tool') && (!report.deployed_tool_identity_matches || !report.deployed_auth_mode_open || report.deployed_build_sha !== process.env.GITHUB_SHA)) throw new Error('deployed_tool_verification_failed')
   } catch (error) {
     const safe = ['missing_workflow_configuration', 'railway_variables_query_failed', 'deployment_configuration_incomplete', 'deployed_tool_verification_failed', 'invalid_configuration_response', 'invalid_health_url'].includes(error.message) ? error.message : 'railway_inspection_failed'
     console.error(safe)

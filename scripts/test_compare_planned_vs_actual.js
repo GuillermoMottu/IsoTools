@@ -8,7 +8,7 @@ const toolEntry = tools.find(tool => tool.id === 'compare_planned_vs_actual')
 
 assert.ok(toolEntry, 'compare_planned_vs_actual must be registered in tools.json')
 assert.deepEqual(toolEntry.produces, ['PRODUCTION_VARIANCE_DETECTED'])
-assert.deepEqual(toolEntry.consumes, [])
+assert.deepEqual(toolEntry.consumes, ['ERP_SALES_PERIOD_CLOSED'])
 assert.ok(toolEntry.outputSchema.properties.status.enum.includes('not_calculable'))
 assert.equal(toolEntry.outputSchema.properties.details.type, 'object')
 
@@ -205,4 +205,20 @@ const missingPlant = runWithoutAsset(baseInput({
 assert.equal(missingPlant.data.status, 'not_calculable')
 assert.ok(missingPlant.data.data_quality.missing_fields.includes('plant_id'))
 
+for (const metric of [null, 42, [], 'bad']) {
+  assert.equal(run(baseInput({ metrics: [metric] })).data.status, 'not_calculable')
+}
+const invalidDate = run(baseInput({ as_of_date: 'invalid-date', metrics: [{ metric_id: 'M1', name: 'Metric', planned: 100, actual: 100, unit: 'items', direction: 'target' }] }))
+assert.equal(invalidDate.data.status, 'not_calculable')
+assert.ok(invalidDate.data.data_quality.warnings.some(warning => warning.includes('as_of_date')))
+for (const thresholds of [null, [], false, { deviation_percent: -1 }, { deviation_percent: '5' }, { deviation_percent: null }, { deviation_percent: Infinity }, { deviation_percent: NaN }, { deviation_percent: 20, critical_percent: 10 }]) {
+  const result = run(baseInput({ thresholds })).data
+  assert.equal(result.status, 'not_calculable')
+  assert.equal(result.audit.thresholds_applied, null)
+  assert.ok(result.data_quality.warnings.some(warning => warning.includes('thresholds')))
+}
+for (const thresholds of [{ deviation_percent: 0, critical_percent: 0 }, { deviationPercent: 0, criticalPercent: 0 }]) {
+  const result = run(baseInput({ thresholds, metrics: [{ metric_id: 'M1', name: 'Metric', planned: 100, actual: 90, unit: 'items', direction: 'higher_is_better' }] })).data
+  assert.equal(result.status, 'critical')
+}
 console.log('compare_planned_vs_actual smoke OK')

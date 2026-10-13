@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { Activity, Briefcase, Play, Plus, RotateCcw } from 'lucide-react'
+import { completedMilestonePercent } from '../../src/utils/projectMilestones.js'
+import { useCallback, useMemo } from 'react'
+import { Activity, Briefcase, Plus } from 'lucide-react'
 import {
   AppShell,
   Badge,
@@ -17,9 +18,11 @@ import {
   Tab,
   Table
 } from './components/controlRoom.jsx'
-import { runComparePlannedVsActual, runTrackProjectProgress } from './api.js'
-import { scenarioPayload } from './scenarios.js'
-import { deriveOperationalVisualModel, deriveProjectVisualModel } from './visualModels.js'
+import { runComparePlannedVsActual, runTrackProjectProgress, saveProjectMilestones, localToday } from './api.js'
+import { useErpRecord, erpSummary } from './useErpRecord.js'
+import { cellError, explainResult, fieldError, fieldName, confidenceLabel, warningText, unitLabel, unitCode } from './resultExplanation.js'
+import { useToolEvaluation } from './useToolEvaluation.js'
+import { deriveOperationalVisualModel, deriveProjectVisualModel, progressBarWidth } from './visualModels.js'
 
 const TOOL_IDS = new Set(['compare_planned_vs_actual', 'track_project_progress'])
 const BUILD_TOOL_ID = import.meta.env.VITE_TOOL_ID
@@ -28,47 +31,31 @@ const TOOLS = {
   compare_planned_vs_actual: {
     id: 'compare_planned_vs_actual',
     path: '/compare_planned_vs_actual',
-    label: 'Comparacion Plan vs Real',
-    clause: '9.1.3 - analisis y evaluacion',
-    eyebrow: 'produccion · plan contra real',
-    description: 'Evalua metas aprobadas contra ejecucion real y prepara el evento de desviacion.',
+    label: 'Comparación plan vs. real',
+    clause: '9.1.3 - análisis y evaluación',
+    eyebrow: 'producción · metas y resultados',
+    description: 'Compara tus metas con los resultados reales e identifica desviaciones.',
     icon: <Activity size={18} />,
-    action: 'Ejecutar comparacion',
+
     event: 'PRODUCTION_VARIANCE_DETECTED',
-    defaultScenario: 'deviation'
   },
   track_project_progress: {
     id: 'track_project_progress',
     path: '/track_project_progress',
-    label: 'Seguimiento de Avance de Proyecto',
-    clause: '6.3 - planificacion de cambios',
+    label: 'Seguimiento de avance de proyecto',
+    clause: '6.3 - planificación de cambios',
     eyebrow: 'proyecto · avance y riesgo',
-    description: 'Evalua avance, presupuesto e hitos para anticipar riesgo de proyecto.',
+    description: 'Evalúa el avance, presupuesto e hitos para anticipar riesgo de proyecto.',
     icon: <Briefcase size={18} />,
-    action: 'Evaluar avance',
+
     event: 'PROJECT_AT_RISK',
-    defaultScenario: 'at_risk'
   }
 }
 
-const COMPARE_SCENARIOS = [
-  ['on_track', 'En rango'],
-  ['deviation', 'Desviacion'],
-  ['critical', 'Critico'],
-  ['validation', 'Datos incompletos']
-]
-
-const TRACK_SCENARIOS = [
-  ['on_track', 'En rango'],
-  ['at_risk', 'En riesgo'],
-  ['delayed', 'Atrasado'],
-  ['validation', 'Datos incompletos']
-]
-
 const STATUS_LABELS = {
   on_track: 'En rango',
-  deviation: 'Desviacion',
-  critical: 'Critico',
+  deviation: 'Desviación',
+  critical: 'Crítico',
   at_risk: 'En riesgo',
   delayed: 'Atrasado',
   not_calculable: 'No calculable',
@@ -77,26 +64,27 @@ const STATUS_LABELS = {
 
 const ACTION_LABELS = {
   continue_monitoring: 'Continuar monitoreo',
-  review_variance: 'Revisar desviacion',
+  review_variance: 'Revisar desviación',
   confirm_data_source: 'Confirmar fuente de datos',
-  open_corrective_action: 'Abrir accion correctiva',
-  review_root_cause: 'Revisar causa raiz',
+  open_corrective_action: 'Abrir acción correctiva',
+  review_root_cause: 'Revisar causa raíz',
   notify_process_owner: 'Notificar responsable del proceso',
   review_project_risk: 'Revisar riesgo del proyecto',
   confirm_milestone_plan: 'Confirmar plan de hitos',
-  escalate_project_review: 'Escalar revision de proyecto',
-  open_recovery_plan: 'Abrir plan de recuperacion',
+  escalate_project_review: 'Escalar revisión de proyecto',
+  open_recovery_plan: 'Abrir plan de recuperación',
   notify_project_owner: 'Notificar responsable del proyecto',
   complete_required_data: 'Completar datos requeridos',
   review_input_quality: 'Revisar calidad de captura'
 }
 
 const RISK_LABELS = {
-  schedule_variance: 'Brecha avance plan vs real',
-  critical_milestone_overdue: 'Hito critico vencido',
+  schedule_variance: 'Avance por debajo de lo planificado',
+  critical_milestone_overdue: 'Hito crítico vencido',
   blocked_milestone: 'Hito bloqueado',
   budget_overrun: 'Presupuesto por encima del avance',
-  missing_evidence: 'Evidencia incompleta'
+  missing_evidence: 'Datos insuficientes',
+  sin_riesgo_abierto: 'Sin riesgos identificados'
 }
 
 function currentToolId () {
@@ -106,11 +94,6 @@ function currentToolId () {
   if (path.includes('track_project_progress')) return 'track_project_progress'
   if (path.includes('compare_planned_vs_actual')) return 'compare_planned_vs_actual'
   return 'compare_planned_vs_actual'
-}
-
-function scenarioInput (toolId, scenario) {
-  const payload = scenarioPayload(scenario)
-  return toolId === 'compare_planned_vs_actual' ? payload.compare : payload.project
 }
 
 export default function App () {
@@ -125,9 +108,7 @@ export default function App () {
       icon={tool.icon}
       tabs={lockedToBuildTool ? null : <ToolTabs active={toolId} />}
     >
-      {toolId === 'compare_planned_vs_actual'
-        ? <ComparePage tool={tool} />
-        : <TrackPage tool={tool} />}
+      <ErpTool key={toolId} tool={tool} />
     </AppShell>
   )
 }
@@ -136,42 +117,50 @@ function ToolTabs ({ active }) {
   return (
     <>
       <Tab active={active === 'compare_planned_vs_actual'} href={TOOLS.compare_planned_vs_actual.path}>
-        compare_planned_vs_actual
+        Plan vs. real
       </Tab>
       <Tab active={active === 'track_project_progress'} href={TOOLS.track_project_progress.path}>
-        track_project_progress
+        Avance de proyecto
       </Tab>
     </>
   )
 }
 
-function ComparePage ({ tool }) {
-  const [scenario, setScenario] = useState(tool.defaultScenario)
-  const [input, setInput] = useState(() => scenarioInput(tool.id, tool.defaultScenario))
-  const [response, setResponse] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+function ErpTool ({ tool }) {
+  const { record, records, requested, setRequested, loading, error } = useErpRecord(tool.id)
+  const project = tool.id === 'track_project_progress'
+  const id = record?.[project ? 'project_id' : 'analysis_id'] || requested
+  return <div className="page-stack">
+    <Panel title={project ? 'Proyecto' : 'Análisis'} subtitle="Resumen de los registros del ERP. Selecciona uno para consultar su evaluación.">
+      {!loading && !error ? <div className="metrics-grid erp-summary">{erpSummary(records, tool.id).map(item => <Metric key={item.label} label={item.label} value={item.value} hint={item.hint} />)}</div> : null}
+      <Field label={project ? 'Seleccionar proyecto' : 'Seleccionar análisis'}>
+        <select className="input" value={id} disabled={loading || Object.keys(records).length === 0} onChange={event => setRequested(event.target.value)}>
+          <option value="">Selecciona un registro del ERP</option>
+          {requested && !Object.hasOwn(records, requested) ? <option value={requested}>Registro no disponible: {requested}</option> : null}
+          {Object.entries(records).map(([id, value]) => <option key={id} value={id}>{project ? `${value.project_name || id} · ${id}` : `${value.plant_id || 'Análisis'} · ${id}`}</option>)}
+        </select>
+      </Field>
+    </Panel>
+    {loading ? <Loading label="Leyendo datos del ERP" /> : error ? <ErrorState title="No se pudo sincronizar con el ERP" detail={error} /> : record
+      ? project ? <TrackPage key={JSON.stringify(record)} tool={tool} initialInput={record} /> : <ComparePage key={JSON.stringify(record)} tool={tool} initialInput={record} />
+      : <EmptyState title={Object.keys(records).length === 0 ? project ? 'Aún no hay proyectos' : 'Aún no hay análisis' : requested ? 'Registro no disponible' : 'Selecciona un registro'} detail={Object.keys(records).length === 0 ? 'Los registros aparecerán aquí cuando se guarden en el ERP.' : requested ? 'La referencia solicitada no existe en el ERP.' : 'Selecciona un registro existente para consultar su evaluación.'} />}
+  </div>
+}
+
+function ErpValue ({ label, value }) {
+  return <dl className="erp-value"><dt>{label}</dt><dd>{value === undefined || value === null || value === '' ? 'No disponible' : String(value)}</dd></dl>
+}
+
+function erpDate (value, dateOnly = false) {
+  if (!value || Number.isNaN(Date.parse(value))) return 'No disponible'
+  if (dateOnly && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split('-').reverse().join('/')
+  return new Date(value).toLocaleString('es-MX', dateOnly ? { year: 'numeric', month: '2-digit', day: '2-digit' } : undefined)
+}
+
+function ComparePage ({ tool, initialInput }) {
+  const { input, setInput, response, loading, error } = useToolEvaluation(() => structuredClone(initialInput), runComparePlannedVsActual)
   const result = response?.result
   const visual = useMemo(() => deriveOperationalVisualModel(input, result), [input, result])
-
-  function selectScenario (nextScenario) {
-    setScenario(nextScenario)
-    setInput(scenarioInput(tool.id, nextScenario))
-    setResponse(null)
-    setError('')
-  }
-
-  async function run () {
-    setLoading(true)
-    setError('')
-    try {
-      setResponse(await runComparePlannedVsActual({ scenario, input }))
-    } catch (err) {
-      setError(err.message || 'No se pudo ejecutar la comparacion')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const dataQuality = result?.data_quality
   const missingFields = dataQuality?.missing_fields || []
@@ -181,62 +170,38 @@ function ComparePage ({ tool }) {
   return (
     <ToolPage
       tool={tool}
-      scenario={scenario}
-      scenarios={COMPARE_SCENARIOS}
       loading={loading}
       error={error}
       response={response}
-      onScenario={selectScenario}
-      onRun={run}
-      onReset={() => selectScenario(scenario)}
       metrics={(
         <>
           <Metric label="Estado" value={STATUS_LABELS[displayStatus] || 'Pendiente'} tone={toneForStatus(displayStatus)} />
-          <Metric label="Desviacion max." value={formatPercent(visual.deviationPercent)} hint="Peor brecha adversa" tone={toneForStatus(visual.status)} />
-          <Metric label="Desviacion ponderada" value={formatPercent(visual.weightedDeviationPercent)} hint="Promedio ponderado" />
-          <Metric label="Calidad de datos" value={result ? dataQuality?.confidence || 'N/D' : 'pendiente'} hint={`${missingFields.length} faltantes · ${warnings.length} avisos`} tone={result ? missingFields.length ? 'danger' : warnings.length ? 'warn' : 'ok' : 'default'} />
+          <Metric label="Mayor desviación" value={formatPercent(visual.deviationPercent)} hint="Mayor diferencia desfavorable respecto a la meta" tone={toneForStatus(visual.status)} />
+          <Metric label="Desviación ponderada" value={formatPercent(visual.weightedDeviationPercent)} hint="Promedio ponderado" />
+          <Metric label="Calidad de los datos" value={result ? confidenceLabel(dataQuality?.confidence) : 'Pendiente'} hint={`${missingFields.length} faltantes · ${warnings.length} avisos`} tone={result ? missingFields.length ? 'danger' : warnings.length ? 'warn' : 'ok' : 'default'} />
         </>
       )}
     >
       <div className="tool-grid">
         <div className="stack">
-          <Panel title="Datos de comparacion" subtitle="Captura editable de la tool">
+          <Panel title="Datos de comparación" subtitle="Información del ERP · solo lectura">
             <div className="form-grid">
-              <Field label="organization_id" required>
-                <Input value={input.organization_id || ''} onChange={event => setField(setInput, 'organization_id', event.target.value)} />
-              </Field>
-              <Field label="analysis_id" required>
-                <Input value={input.analysis_id || ''} onChange={event => setField(setInput, 'analysis_id', event.target.value)} />
-              </Field>
-              <Field label="plant_id" required>
-                <Input value={input.plant_id || ''} onChange={event => setField(setInput, 'plant_id', event.target.value)} />
-              </Field>
-              <Field label="as_of_date" required>
-                <Input type="datetime-local" value={datetimeLocal(input.as_of_date)} onChange={event => setField(setInput, 'as_of_date', fromDatetimeLocal(event.target.value))} />
-              </Field>
-              <Field label="period">
-                <select className="input" value={input.period || ''} onChange={event => setField(setInput, 'period', event.target.value)}>
-                  <option value="">N/D</option>
-                  <option value="daily">daily</option>
-                  <option value="weekly">weekly</option>
-                  <option value="monthly">monthly</option>
-                </select>
-              </Field>
-              <Field label="umbrales">
-                <div className="inline-fields">
-                  <Input type="number" value={numberValue(input.thresholds?.deviation_percent)} onChange={event => setNestedNumber(setInput, ['thresholds', 'deviation_percent'], event.target.value)} aria-label="deviation_percent" />
-                  <Input type="number" value={numberValue(input.thresholds?.critical_percent)} onChange={event => setNestedNumber(setInput, ['thresholds', 'critical_percent'], event.target.value)} aria-label="critical_percent" />
-                </div>
-              </Field>
+              <ErpValue label="Organización" value={input.organization_id} />
+              <ErpValue label="Referencia del análisis" value={input.analysis_id} />
+              <ErpValue label="Planta" value={input.plant_id} />
+              <ErpValue label="Fecha de corte" value={erpDate(input.as_of_date)} />
+              <ErpValue label="Periodo" value={{ daily: 'Diario', weekly: 'Semanal', monthly: 'Mensual' }[input.period] || 'No disponible'} />
+              <ErpValue label="Umbral de desviación (%)" value={input.thresholds?.deviation_percent ?? input.thresholds?.deviationPercent ?? '5 (predeterminado)'} />
+              <ErpValue label="Umbral crítico (%)" value={input.thresholds?.critical_percent ?? input.thresholds?.criticalPercent ?? '15 (predeterminado)'} />
             </div>
           </Panel>
 
           <Panel
-            title="Metricas plan vs real"
-            subtitle="planned, actual, direction y weight se envian al handler"
+            title="Indicadores: metas y resultados"
+            subtitle="Compara cada indicador en su unidad. La importancia determina su contribución al promedio."
             actions={<Button onClick={() => addMetric(setInput)}> <Plus size={14} /> Agregar</Button>}
           >
-            <MetricsEditor metrics={input.metrics || []} setInput={setInput} evaluated={result?.details?.metrics || []} />
+            <MetricsEditor metrics={input.metrics || []} setInput={setInput} checked={Boolean(result)} evaluated={result?.details?.metrics || []} />
           </Panel>
         </div>
 
@@ -253,34 +218,23 @@ function ComparePage ({ tool }) {
   )
 }
 
-function TrackPage ({ tool }) {
-  const [scenario, setScenario] = useState(tool.defaultScenario)
-  const [input, setInput] = useState(() => scenarioInput(tool.id, tool.defaultScenario))
-  const [response, setResponse] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+function TrackPage ({ tool, initialInput }) {
+  const evaluate = useCallback(async ({ input }) => {
+    if (JSON.stringify(input.milestones || []) !== JSON.stringify(initialInput.milestones || [])) await saveProjectMilestones(input.project_id, input.milestones || [])
+    return runTrackProjectProgress({ input })
+  }, [initialInput])
+  const evaluation = useToolEvaluation(() => ({ ...structuredClone(initialInput), actual_progress_percent: completedMilestonePercent(initialInput.milestones) }), evaluate)
+  const { input, response, loading, error } = evaluation
+  function setInput (update) {
+    evaluation.setInput(current => {
+      const next = typeof update === 'function' ? update(current) : update
+      return { ...next, actual_progress_percent: completedMilestonePercent(next.milestones) }
+    })
+  }
+  const evaluationDate = response?.input?.as_of_date || localToday()
   const result = response?.result
-  const visual = useMemo(() => deriveProjectVisualModel(input, result), [input, result])
+  const visual = useMemo(() => deriveProjectVisualModel({ ...input, as_of_date: evaluationDate }, result), [input, result, evaluationDate])
   const summary = result?.milestone_summary || {}
-
-  function selectScenario (nextScenario) {
-    setScenario(nextScenario)
-    setInput(scenarioInput(tool.id, nextScenario))
-    setResponse(null)
-    setError('')
-  }
-
-  async function run () {
-    setLoading(true)
-    setError('')
-    try {
-      setResponse(await runTrackProjectProgress({ scenario, input }))
-    } catch (err) {
-      setError(err.message || 'No se pudo evaluar el avance')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const dataQuality = result?.data_quality
   const missingFields = dataQuality?.missing_fields || []
@@ -294,72 +248,49 @@ function TrackPage ({ tool }) {
   return (
     <ToolPage
       tool={tool}
-      scenario={scenario}
-      scenarios={TRACK_SCENARIOS}
       loading={loading}
       error={error}
       response={response}
-      onScenario={selectScenario}
-      onRun={run}
-      onReset={() => selectScenario(scenario)}
       metrics={(
         <>
           <Metric label="Estado" value={STATUS_LABELS[displayStatus] || 'Pendiente'} tone={toneForStatus(displayStatus)} />
-          <Metric label="Avance plan / real" value={`${formatPercent(visual.plannedProgress)} / ${formatPercent(visual.actualProgress)}`} />
-          <Metric label="Hitos abiertos" value={`${overdueCount} vencidos`} hint={`${criticalOverdueCount} criticos · ${blockedCount} bloqueados`} tone={(overdueCount || blockedCount) ? 'warn' : 'ok'} />
-          <Metric label="Presupuesto usado" value={formatPercent(visual.budgetUsedPercent)} hint={`Brecha ${formatPercent(visual.scheduleVariancePercent)}`} tone={toneForStatus(visual.status)} />
+          <Metric label="Avance planificado / real" value={`${formatPercent(visual.plannedProgress)} / ${formatPercent(visual.actualProgress)}`} />
+          <Metric label="Hitos abiertos" value={`${overdueCount} vencidos`} hint={`${criticalOverdueCount} críticos · ${blockedCount} bloqueados`} tone={(overdueCount || blockedCount) ? 'warn' : 'ok'} />
+          <Metric label="Presupuesto utilizado" value={formatPercent(visual.budgetUsedPercent)} hint={`Diferencia de avance: ${visual.scheduleVariancePercent === null ? "No disponible" : `${visual.scheduleVariancePercent} puntos porcentuales`}`} tone={toneForStatus(visual.status)} />
         </>
       )}
     >
       <div className="tool-grid">
         <div className="stack">
-          <Panel title="Datos del proyecto" subtitle="Entrada propia de track_project_progress">
+          <Panel title="Datos del proyecto" subtitle="Información del ERP · solo lectura">
             <div className="form-grid">
-              <Field label="organization_id" required>
-                <Input value={input.organization_id || ''} onChange={event => setField(setInput, 'organization_id', event.target.value)} />
-              </Field>
-              <Field label="project_id" required>
-                <Input value={input.project_id || ''} onChange={event => setField(setInput, 'project_id', event.target.value)} />
-              </Field>
-              <Field label="project_name" required>
-                <Input value={input.project_name || ''} onChange={event => setField(setInput, 'project_name', event.target.value)} />
-              </Field>
-              <Field label="as_of_date" required>
-                <Input type="datetime-local" value={datetimeLocal(input.as_of_date)} onChange={event => setField(setInput, 'as_of_date', fromDatetimeLocal(event.target.value))} />
-              </Field>
-              <Field label="planned_start_date" required>
-                <Input type="date" value={dateOnly(input.planned_start_date)} onChange={event => setField(setInput, 'planned_start_date', event.target.value)} />
-              </Field>
-              <Field label="planned_end_date" required>
-                <Input type="date" value={dateOnly(input.planned_end_date)} onChange={event => setField(setInput, 'planned_end_date', event.target.value)} />
-              </Field>
+              <ErpValue label="Organización" value={input.organization_id} />
+              <ErpValue label="Referencia del proyecto" value={input.project_id} />
+              <ErpValue label="Nombre del proyecto" value={input.project_name} />
+              <ErpValue label="Fecha de corte del ERP" value={erpDate(input.as_of_date)} />
+              <ErpValue label="Fecha de evaluación" value={erpDate(evaluationDate, true)} />
+              <ErpValue label="Inicio planificado" value={erpDate(input.planned_start_date, true)} />
+              <ErpValue label="Fin planificado" value={erpDate(input.planned_end_date, true)} />
             </div>
           </Panel>
 
-          <Panel title="Avance y presupuesto" subtitle="Se compara avance real contra plan y presupuesto ejercido">
+          <Panel title="Avance y presupuesto" subtitle="Datos del ERP y avance calculado a partir de los hitos">
             <div className="form-grid">
-              <Field label="planned_progress_percent" required>
-                <Input type="number" value={numberValue(input.planned_progress_percent)} onChange={event => setNumber(setInput, 'planned_progress_percent', event.target.value)} />
-              </Field>
-              <Field label="actual_progress_percent" required>
-                <Input type="number" value={numberValue(input.actual_progress_percent)} onChange={event => setNumber(setInput, 'actual_progress_percent', event.target.value)} />
-              </Field>
-              <Field label="budget.planned_amount">
-                <Input type="number" value={numberValue(input.budget?.planned_amount)} onChange={event => setNestedNumber(setInput, ['budget', 'planned_amount'], event.target.value)} />
-              </Field>
-              <Field label="budget.actual_amount">
-                <Input type="number" value={numberValue(input.budget?.actual_amount)} onChange={event => setNestedNumber(setInput, ['budget', 'actual_amount'], event.target.value)} />
-              </Field>
+              <ErpValue label="Avance planificado (%)" value={formatPercent(visual.plannedProgress)} />
+              <ErpValue label="Avance real (%)" value={formatPercent(visual.actualProgress)} />
+              <ErpValue label="Presupuesto planificado" value={input.budget?.planned_amount} />
+              <ErpValue label="Moneda del presupuesto" value={input.budget?.currency} />
+              <ErpValue label="Presupuesto ejercido" value={input.budget?.actual_amount} />
             </div>
-            <ProgressPair planned={input.planned_progress_percent} actual={input.actual_progress_percent} budget={visual.budgetUsedPercent} />
+            <ProgressPair visual={visual} />
           </Panel>
 
           <Panel
             title="Hitos"
-            subtitle="Vencidos, criticos y bloqueados elevan el estado"
+            subtitle="El avance real corresponde a los hitos completados. Los hitos cancelados no cuentan."
             actions={<Button onClick={() => addMilestone(setInput)}><Plus size={14} /> Agregar</Button>}
           >
-            <MilestonesEditor milestones={input.milestones || []} setInput={setInput} />
+            <MilestonesEditor milestones={input.milestones || []} checked={Boolean(result)} setInput={setInput} />
           </Panel>
         </div>
 
@@ -377,42 +308,29 @@ function TrackPage ({ tool }) {
   )
 }
 
-function ToolPage ({ tool, scenario, scenarios, loading, error, metrics, response, onScenario, onRun, onReset, children }) {
+function ToolPage ({ tool, loading, error, metrics, response, children }) {
   return (
     <div className="page-stack">
       <PageHeader
         eyebrow={tool.eyebrow}
         title={tool.label}
         description={tool.description}
-        actions={(
-          <>
-            <Button onClick={onReset}><RotateCcw size={14} /> Restaurar</Button>
-            <Button variant="primary" loading={loading} onClick={onRun}>
-              <Play size={14} />
-              {tool.action}
-            </Button>
-          </>
-        )}
       />
+      <p role="status">{loading ? 'Actualizando evaluación…' : 'La evaluación se actualiza automáticamente al cambiar los datos.'}</p>
 
-      <section className="scenario-row" aria-label="Escenarios">
-        {scenarios.map(([id, label]) => (
-          <Button className={scenario === id ? 'selected' : ''} key={id} onClick={() => onScenario(id)}>
-            {label}
-          </Button>
-        ))}
-      </section>
-
-      {error ? <ErrorState title="No se pudo ejecutar la tool" detail={error} /> : null}
+      {error ? <ErrorState title="No se pudo actualizar la evaluación" detail={error} /> : null}
 
       <section className="metrics-grid">
         {metrics}
       </section>
 
-      {children}
+      <fieldset className="evaluation-fields" aria-busy={loading}>
+        <legend className="sr-only">Captura y resultado de la evaluación</legend>
+        {children}
+      </fieldset>
 
       {!response && !loading ? (
-        <EmptyState title="Sin ejecucion en esta sesion" detail="Ajusta la captura o usa un escenario y ejecuta la accion primaria." />
+        <EmptyState title="Evaluación pendiente" detail="Los resultados se actualizarán automáticamente con los datos de la captura." />
       ) : null}
     </div>
   )
@@ -424,35 +342,24 @@ function ResultColumn ({ tool, result, response, loading, missingFields, warning
 
   return (
     <aside className="stack">
-      <Panel title="Estado y evento esperado" subtitle="Preview server-side; no publica por si solo">
-        {loading ? <Loading label="Ejecutando tool" /> : null}
+      <Panel title="Resultado de la evaluación" subtitle="Esta evaluación prepara información; no publica ni realiza acciones automáticamente.">
+        {loading ? <Loading label="Evaluando información" /> : null}
         {!loading ? (
           <div className="status-stack">
             <StatusChip status={STATUS_LABELS[result?.status] || 'Pendiente'} tone={toneForStatus(result?.status)} />
-            <div className="event-card">
-              <span>Evento esperado</span>
-              <Mono>{tool.event}</Mono>
-              <Badge tone={emitted ? 'ok' : 'neutral'}>{emitted ? 'preparado' : 'sin emitir'}</Badge>
-            </div>
-            {tool.id === 'track_project_progress' ? (
-              <div className="event-card">
-                <span>Impacto hacia automate_followups</span>
-                <Mono>{downstream?.applies ? 'aplica' : 'no aplica'}</Mono>
-                <p>Solo aplica cuando el estado es <Mono>at_risk</Mono>.</p>
-              </div>
-            ) : null}
+            {result ? <div aria-live="polite" className="quality-list">{explainResult(response.input, result).map((line, index) => <p key={index}>{line}</p>)}</div> : <p>Completa la captura para actualizar la evaluación automáticamente.</p>}
           </div>
         ) : null}
       </Panel>
 
-      <Panel title="Calidad de datos">
-        <DataQuality pending={!response && !loading} missingFields={missingFields} warnings={warnings} />
+      <Panel title="Calidad de los datos">
+        <DataQuality loading={loading} pending={!response} missingFields={missingFields} warnings={warnings} />
       </Panel>
 
       {risks.length ? (
         <Panel title="Lectura de riesgo">
           <div className="chip-list">
-            {risks.map(risk => <Badge tone={risk === 'sin_riesgo_abierto' ? 'ok' : 'warn'} key={risk}>{RISK_LABELS[risk] || risk}</Badge>)}
+            {risks.map(risk => <Badge tone={risk === 'sin_riesgo_abierto' ? 'ok' : 'warn'} key={risk}>{RISK_LABELS[risk] || 'Riesgo por revisar'}</Badge>)}
           </div>
         </Panel>
       ) : null}
@@ -461,106 +368,129 @@ function ResultColumn ({ tool, result, response, loading, missingFields, warning
         <ActionList actions={result?.recommended_actions || []} />
       </Panel>
 
-      <Panel title="Payload y resultado">
+      <details className="technical-details">
+        <summary>Detalles técnicos de la evaluación</summary>
+        <p>Evento: <span>{tool.id === 'track_project_progress' ? 'Proyecto en riesgo' : 'Desviación detectada'}</span> · {emitted ? 'Preparado, sin publicar' : 'Sin evento preparado'}</p>
+        {tool.id === 'track_project_progress' ? <p>Regla de seguimiento automático: {downstream?.applies ? 'aplica' : 'no aplica'}. Solo corresponde al estado de riesgo definido por el contrato.</p> : null}
+        <Panel title="Entrada y resultado">
         <pre className="json-preview">{JSON.stringify(response ? {
           input: response.input,
           result: response.result,
           emitted_event: response.emitted_event
         } : { pending: true }, null, 2)}</pre>
-      </Panel>
+        </Panel>
+      </details>
     </aside>
   )
 }
 
-function MetricsEditor ({ metrics, setInput, evaluated }) {
+function MetricsEditor ({ metrics, setInput, evaluated, checked }) {
   return (
     <Table
       rows={metrics}
       getRowKey={(row, index) => `${row.metric_id || 'metric'}-${index}`}
-      empty={<EmptyState title="Sin metricas" detail="Agrega al menos una metrica para calcular la comparacion." />}
+      empty={<EmptyState title="Sin indicadores" detail="Agrega al menos un indicador para calcular la comparación." />}
       columns={[
         {
           key: 'metric',
-          header: 'metric_id',
-          render: (row, index) => <Input value={row.metric_id || ''} onChange={event => updateMetric(setInput, index, 'metric_id', event.target.value)} />
+          header: 'Referencia',
+          render: (row, index) => <Input aria-label={`Referencia, indicador ${index + 1}`} error={cellError(row.metric_id, 'metric_id', checked)} value={row.metric_id || ''} onChange={event => updateMetric(setInput, index, 'metric_id', event.target.value)} />
+        },
+        ...[['name', 'Nombre'], ['unit', 'Unidad']].map(([key, label]) => ({
+          key, header: label,
+          render: (row, index) => <Input aria-label={`${label}, indicador ${index + 1}`} error={cellError(row[key], key, checked)} value={key === 'unit' && row[key] ? unitLabel(row[key]) : row[key] || ''} onChange={event => updateMetric(setInput, index, key, key === 'unit' ? unitCode(event.target.value) : event.target.value)} />
+        })),
+        {
+          key: 'weight', header: 'Importancia',
+          render: (row, index) => <Input type="number" min="0" step="any" aria-label={`Importancia, indicador ${index + 1}`} error={cellError(row.weight, 'weight', checked)} value={numberValue(row.weight)} onChange={event => updateMetricNumber(setInput, index, 'weight', event.target.value)} />
         },
         {
           key: 'planned',
-          header: 'planned',
-          render: (row, index) => <Input type="number" value={numberValue(row.planned)} onChange={event => updateMetricNumber(setInput, index, 'planned', event.target.value)} />
+          header: 'Planificado',
+          render: (row, index) => <Input type="number" aria-label={`Valor planificado, indicador ${index + 1}`} error={cellError(row.planned, 'planned', checked)} value={numberValue(row.planned)} onChange={event => updateMetricNumber(setInput, index, 'planned', event.target.value)} />
         },
         {
           key: 'actual',
-          header: 'actual',
-          render: (row, index) => <Input type="number" value={numberValue(row.actual)} onChange={event => updateMetricNumber(setInput, index, 'actual', event.target.value)} />
+          header: 'Real',
+          render: (row, index) => <Input type="number" aria-label={`Valor real, indicador ${index + 1}`} error={cellError(row.actual, 'actual', checked)} value={numberValue(row.actual)} onChange={event => updateMetricNumber(setInput, index, 'actual', event.target.value)} />
         },
         {
           key: 'direction',
-          header: 'direction',
+          header: 'Criterio',
           render: (row, index) => (
-            <select className="input" value={row.direction || 'target'} onChange={event => updateMetric(setInput, index, 'direction', event.target.value)}>
-              <option value="higher_is_better">higher_is_better</option>
-              <option value="lower_is_better">lower_is_better</option>
-              <option value="target">target</option>
+            <select aria-label={`Criterio, indicador ${index + 1}`} className="input" value={row.direction || 'target'} onChange={event => updateMetric(setInput, index, 'direction', event.target.value)}>
+              <option value="higher_is_better">Mayor es mejor</option>
+              <option value="lower_is_better">Menor es mejor</option>
+              <option value="target">Valor objetivo</option>
             </select>
           )
         },
         {
           key: 'status',
-          header: 'estado',
-          render: (row, index) => <StatusChip status={STATUS_LABELS[evaluated[index]?.status] || 'Pendiente'} tone={toneForStatus(evaluated[index]?.status)} />
+          header: 'Resultado',
+          render: (row, index) => <div><StatusChip status={STATUS_LABELS[evaluated[index]?.status] || 'Pendiente'} tone={toneForStatus(evaluated[index]?.status)} /><p>Desviación desfavorable: {formatPercent(evaluated[index]?.adverse_percent)}</p></div>
+        },
+        {
+          key: 'remove', header: 'Acciones',
+          render: (row, index) => <Button aria-label={`Eliminar indicador ${index + 1}`} onClick={() => setInput(current => ({ ...current, metrics: current.metrics.filter((item, itemIndex) => itemIndex !== index) }))}>Eliminar</Button>
         }
       ]}
     />
   )
 }
 
-function MilestonesEditor ({ milestones, setInput }) {
+function MilestonesEditor ({ milestones, setInput, checked }) {
   return (
     <Table
       rows={milestones}
       getRowKey={(row, index) => `${row.milestone_id || 'milestone'}-${index}`}
-      empty={<EmptyState title="Sin hitos" detail="La tool puede evaluar avance sin hitos, pero la lectura de riesgo sera menos completa." />}
+      empty={<EmptyState title="Sin hitos" detail="El avance puede evaluarse sin hitos, pero la lectura de riesgo será menos completa." />}
       columns={[
         {
           key: 'name',
-          header: 'hito',
-          render: (row, index) => <Input value={row.name || ''} onChange={event => updateMilestone(setInput, index, 'name', event.target.value)} />
+          header: 'Hito',
+          render: (row, index) => <Input aria-label={`Nombre, hito ${index + 1}`} error={cellError(row.name, 'name', checked)} value={row.name || ''} onChange={event => updateMilestone(setInput, index, 'name', event.target.value)} />
         },
         {
           key: 'due',
-          header: 'due_date',
-          render: (row, index) => <Input type="date" value={dateOnly(row.due_date)} onChange={event => updateMilestone(setInput, index, 'due_date', event.target.value)} />
+          header: 'Fecha de compromiso',
+          render: (row, index) => <Input aria-label={`Fecha de compromiso, hito ${index + 1}`} type="date" error={cellError(row.due_date, 'due_date', checked)} value={dateOnly(row.due_date)} onChange={event => updateMilestone(setInput, index, 'due_date', event.target.value)} />
         },
         {
           key: 'status',
-          header: 'status',
+          header: 'Estado',
           render: (row, index) => (
-            <select className="input" value={row.status || 'pending'} onChange={event => updateMilestone(setInput, index, 'status', event.target.value)}>
-              <option value="pending">pending</option>
-              <option value="completed">completed</option>
-              <option value="blocked">blocked</option>
+            <select aria-label={`Estado, hito ${index + 1}`} className="input" value={row.status || 'pending'} onChange={event => updateMilestone(setInput, index, 'status', event.target.value)}>
+              <option value="pending">Pendiente</option>
+              <option value="completed">Completado</option>
+              <option value="blocked">Bloqueado</option>
+              <option value="cancelled">Cancelado</option>
             </select>
           )
         },
         {
           key: 'critical',
-          header: 'critical',
+          header: 'Crítico',
           render: (row, index) => (
             <label className="checkbox-field">
-              <input type="checkbox" checked={row.critical === true} onChange={event => updateMilestone(setInput, index, 'critical', event.target.checked)} />
-              <span>{row.critical ? 'si' : 'no'}</span>
+              <input aria-label={`Hito crítico, ${row.name || index + 1}`} type="checkbox" checked={row.critical === true} onChange={event => updateMilestone(setInput, index, 'critical', event.target.checked)} />
+              <span>{row.critical ? 'Sí' : 'No'}</span>
             </label>
           )
+        },
+        {
+          key: 'remove', header: 'Acciones',
+          render: (row, index) => <Button aria-label={`Eliminar hito ${index + 1}`} onClick={() => setInput(current => ({ ...current, milestones: current.milestones.filter((item, itemIndex) => itemIndex !== index) }))}>Eliminar</Button>
         }
       ]}
     />
   )
 }
 
-function DataQuality ({ pending, missingFields, warnings }) {
+function DataQuality ({ loading, pending, missingFields, warnings }) {
+  if (loading) return <Loading label="Validando datos" />
   if (pending) {
-    return <EmptyState title="Pendiente de ejecucion" detail="La calidad de datos se confirma al ejecutar la tool." />
+    return <EmptyState title="Evaluación pendiente" detail="La calidad de los datos se confirma durante la evaluación automática." />
   }
 
   if (!missingFields.length && !warnings.length) {
@@ -572,13 +502,13 @@ function DataQuality ({ pending, missingFields, warnings }) {
       {missingFields.map(field => (
         <div className="quality-row danger" key={`missing-${field}`}>
           <Badge tone="danger">faltante</Badge>
-          <Mono>{field}</Mono>
+          <span>{fieldName(field)}</span>
         </div>
       ))}
       {warnings.map(warning => (
         <div className="quality-row warn" key={`warning-${warning}`}>
           <Badge tone="warn">aviso</Badge>
-          <Mono>{warning}</Mono>
+          <span>{warningText(warning)}</span>
         </div>
       ))}
     </div>
@@ -586,38 +516,36 @@ function DataQuality ({ pending, missingFields, warnings }) {
 }
 
 function ActionList ({ actions }) {
-  if (!actions.length) return <EmptyState title="Sin acciones" detail="Ejecuta la tool para obtener recomendaciones." />
+  if (!actions.length) return <EmptyState title="Sin acciones" detail="Las recomendaciones aparecerán al completar la evaluación." />
   return (
     <div className="action-list">
       {actions.map(action => (
         <div className="action-row" key={action}>
-          <span>{ACTION_LABELS[action] || action}</span>
-          <Mono>{action}</Mono>
+          <span>{ACTION_LABELS[action] || 'Revisar el resultado de la evaluación'}</span>
+
         </div>
       ))}
     </div>
   )
 }
 
-function ProgressPair ({ planned, actual, budget }) {
+function ProgressPair ({ visual }) {
+  const tones = { success: 'ok', warning: 'warn', danger: 'danger', neutral: 'neutral' }
   return (
     <div className="progress-stack">
-      <ProgressBar label="planned_progress_percent" value={planned} tone="info" />
-      <ProgressBar label="actual_progress_percent" value={actual} tone="ok" />
-      <ProgressBar label="budget_used_percent" value={budget} tone="warn" />
+      <ProgressBar label="Avance planificado" value={visual.plannedProgress} tone="info" />
+      <ProgressBar label="Avance real" value={visual.actualProgress} tone={tones[visual.scheduleBarTone]} />
+      <ProgressBar label="Presupuesto utilizado" value={visual.budgetUsedPercent} tone="budget" allowOverflow />
     </div>
   )
 }
 
-function ProgressBar ({ label, value, tone }) {
-  const width = clampPercent(value)
+function ProgressBar ({ label, value, tone, allowOverflow = false }) {
+  const width = progressBarWidth(value, allowOverflow)
   return (
     <div className={`progress-row tone-${tone}`}>
-      <div>
-        <Mono>{label}</Mono>
-        <Mono>{formatPercent(value)}</Mono>
-      </div>
-      <span><i style={{ width: `${width}%` }} /></span>
+      <div><span>{label}</span><Mono>{width === null ? 'No disponible' : formatPercent(value)}</Mono></div>
+      {width === null ? <small>Sin datos válidos para representar este porcentaje.</small> : <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={width} aria-valuetext={formatPercent(value)}><i style={{ width: `${width}%` }} /></span>}
     </div>
   )
 }
@@ -668,7 +596,7 @@ function addMetric (setInput) {
     metrics: [
       ...(current.metrics || []),
       {
-        metric_id: `KPI-${(current.metrics || []).length + 1}`,
+        metric_id: `KPI-${crypto.randomUUID()}`,
         name: 'Indicador adicional',
         planned: 100,
         actual: 95,
@@ -686,7 +614,7 @@ function addMilestone (setInput) {
     milestones: [
       ...(current.milestones || []),
       {
-        milestone_id: `MS-${(current.milestones || []).length + 1}`,
+        milestone_id: `MS-${crypto.randomUUID()}`,
         name: 'Nuevo hito',
         due_date: dateOnly(current.as_of_date || new Date().toISOString()),
         status: 'pending',
@@ -707,29 +635,12 @@ function numberValue (value) {
 }
 
 function formatPercent (value) {
-  return typeof value === 'number' && Number.isFinite(value) ? `${value}%` : 'N/D'
+  return typeof value === 'number' && Number.isFinite(value) ? `${value}%` : 'No disponible'
 }
 
 function dateOnly (value) {
   if (!value) return ''
   return String(value).slice(0, 10)
-}
-
-function datetimeLocal (value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
-}
-
-function fromDatetimeLocal (value) {
-  return value ? new Date(value).toISOString() : ''
-}
-
-function clampPercent (value) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return 0
-  return Math.max(0, Math.min(100, number))
 }
 
 function toneForStatus (status) {

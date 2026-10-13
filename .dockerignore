@@ -7,5 +7,7 @@ demo-frontend/dist
 .env
 .env.*
 .git
+tmp
+.tool-state
 npm-debug.log*
 docker-compose.yml

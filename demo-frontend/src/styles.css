@@ -7,7 +7,7 @@
   --border: #262d35;
   --text: #e6e9ec;
   --muted: #9aa4ae;
-  --faint: #6b7681;
+  --faint: #a2adb8;
   --brass: #d6a23e;
   --ok: #3fb36b;
   --warn: #e0a93b;
@@ -145,7 +145,7 @@ a {
 .tool-title p {
   margin: 2px 0 0;
   color: var(--faint);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .tabs-bar {
@@ -160,7 +160,7 @@ a {
   padding: 9px 12px 8px;
   color: var(--muted);
   text-decoration: none;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .tab-link:hover {
@@ -179,7 +179,7 @@ a {
   color: var(--danger);
   padding: 8px 24px;
   text-align: center;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .app-main {
@@ -192,6 +192,7 @@ a {
 .quality-list,
 .action-list,
 .progress-stack {
+  min-width: 0;
   display: grid;
   gap: 14px;
 }
@@ -212,7 +213,7 @@ a {
 .page-header p {
   margin: 0 0 4px;
   color: var(--faint);
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
 }
 
@@ -261,6 +262,7 @@ a {
 
 .panel,
 .metric {
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -293,7 +295,7 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--faint);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .panel-body {
@@ -306,7 +308,7 @@ a {
 
 .metric p {
   color: var(--faint);
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
 }
 
@@ -324,7 +326,7 @@ a {
   display: block;
   margin-top: 5px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .tone-ok.metric strong {
@@ -374,7 +376,7 @@ a {
   background: var(--surface2);
   color: var(--muted);
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .button:hover,
@@ -405,7 +407,7 @@ a {
   background: var(--surface2);
   color: var(--text);
   padding: 4px 7px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -461,7 +463,7 @@ a {
 
 .field > span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -472,7 +474,7 @@ a {
 
 .field small {
   color: var(--faint);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .input {
@@ -483,7 +485,7 @@ a {
   background: var(--bg);
   color: var(--text);
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .inline-fields {
@@ -497,7 +499,7 @@ a {
 .table-wrap table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .table-wrap th {
@@ -534,7 +536,7 @@ a {
   padding: 24px;
   color: var(--faint);
   text-align: center;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .empty-state p {
@@ -545,7 +547,7 @@ a {
 
 .empty-state span {
   color: var(--faint);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .error-state {
@@ -574,7 +576,7 @@ a {
   border-radius: 6px;
   background: var(--surface2);
   padding: 10px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .event-card > span,
@@ -596,7 +598,7 @@ a {
   background: var(--bg);
   color: var(--muted);
   padding: 10px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -606,7 +608,7 @@ a {
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .checkbox-field input {
@@ -623,7 +625,7 @@ a {
   justify-content: space-between;
   gap: 12px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .progress-row > span {
@@ -686,3 +688,22 @@ a {
     flex: 1;
   }
 }
+
+.evaluation-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.technical-details summary { cursor: pointer; padding: 12px 0; }
+.input:focus-visible, .button:focus-visible, summary:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+.cell-input { display: grid; gap: 4px; }
+
+.erp-value { margin: 0; padding: 10px 0; min-width: 0; }
+.erp-value dt { color: var(--text-muted, #a6b1c2); font-size: 13px; margin-bottom: 6px; }
+.erp-value dd { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+
+.tone-budget.progress-row i { background: #a78bfa; }
+.erp-summary { margin-bottom: 20px; }

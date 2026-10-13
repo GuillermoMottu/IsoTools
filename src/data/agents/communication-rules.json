@@ -3,6 +3,16 @@
   "description": "Reglas de comunicación entre tools de agentes industriales CTRLHACK",
   "rules": [
     {
+      "id": "rule-conn-001",
+      "sourceToolId": "sync_erp_data_local",
+      "targetToolId": "compare_planned_vs_actual",
+      "event": "ERP_SALES_PERIOD_CLOSED",
+      "protocol": "REST",
+      "topic": "POST /api/mgmt/plan-vs-real",
+      "triggerCondition": "always",
+      "description": "Cierre de ventas del periodo desde el ERP alimenta la comparacion plan vs real"
+    },
+    {
       "id": "rule-erp-001",
       "sourceToolId": "sync_erp_data_local",
       "targetToolId": "get_inventory_status",

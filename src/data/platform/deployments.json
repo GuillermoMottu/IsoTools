@@ -81,9 +81,9 @@
     { "toolId": "calculate_cpk_ppk", "kind": "native", "status": "live", "isoClause": "9.1.3" },
     { "toolId": "run_msa_analysis", "kind": "native", "status": "live", "isoClause": "7.1.5.2" },
     { "toolId": "detect_business_anomalies", "kind": "native", "status": "live", "isoClause": "9.1.3" },
-    { "toolId": "compare_planned_vs_actual", "kind": "native", "status": "live", "isoClause": "9.1.1" },
+    { "toolId": "compare_planned_vs_actual", "kind": "federated", "status": "live", "subdomain": "cpa", "localPort": 8106, "owner": "Guillermo Mottu", "isoClause": "9.1.1", "note": "Dominio cpa verificado en upstream y por GET /health. La nueva version del consumidor de esta rama aun requiere despliegue. Configurar PLATFORM_DOMAIN o TOOL_URL_COMPARE_PLANNED_VS_ACTUAL en el core para delegar." },
     { "toolId": "generate_kpis", "kind": "native", "status": "live", "isoClause": "9.1.1" },
-    { "toolId": "track_project_progress", "kind": "native", "status": "live", "isoClause": "6.2" },
+    { "toolId": "track_project_progress", "kind": "federated", "status": "pending", "subdomain": "tpp", "owner": "Guillermo Mottu", "isoClause": "6.2", "note": "Dominio tpp.orcalabs.mx verificado. Coordinar registro en el core con clave central valida y activacion del consumidor; la salud HTTP no acredita la cadena funcional." },
     { "toolId": "automate_followups", "kind": "native", "status": "live", "isoClause": "10.2" }
   ]
 }

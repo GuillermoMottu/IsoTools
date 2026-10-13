@@ -1,3 +1,4 @@
+import { isMilestoneOverdue } from '../../src/utils/projectMilestones.js'
 const STATUS_TONES = {
   on_track: 'success',
   deviation: 'warning',
@@ -66,8 +67,8 @@ export function deriveOperationalVisualModel (compare = {}, result) {
   const inRange = metrics.filter(metric => metric.status === 'on_track').length
   const calculable = metrics.filter(metric => metric.status !== 'not_calculable').length
   const compliancePercent = metrics.length > 0 ? round((inRange / metrics.length) * 100) : null
-  const deviationPercent = toFiniteNumber(result?.deviation_percent) ?? maxMetricValue(metrics, 'adversePercent')
-  const weightedDeviationPercent = toFiniteNumber(result?.weighted_deviation_percent) ?? averageMetricValue(metrics, 'adversePercent')
+  const deviationPercent = result ? toFiniteNumber(result.deviation_percent) : maxMetricValue(metrics, 'adversePercent')
+  const weightedDeviationPercent = result ? toFiniteNumber(result.weighted_deviation_percent) : averageMetricValue(metrics, 'adversePercent')
 
   return {
     status,
@@ -96,16 +97,20 @@ export function deriveOperationalVisualModel (compare = {}, result) {
 }
 
 export function deriveProjectVisualModel (project = {}, result) {
-  const plannedProgress = toFiniteNumber(project.planned_progress_percent)
-  const actualProgress = toFiniteNumber(result?.completionPercent) ?? toFiniteNumber(project.actual_progress_percent)
-  const budgetUsedPercent = toFiniteNumber(result?.budgetUsedPercent) ?? calculateBudgetUsedPercent(project.budget)
+  const plannedProgress = progressPercent(project.planned_progress_percent)
+  const actualProgress = progressPercent(result ? result.completionPercent : project.actual_progress_percent)
+  const budgetUsedPercent = result ? nonNegativeNumber(result.budgetUsedPercent) : calculateBudgetUsedPercent(project.budget)
+  const thresholds = result?.audit?.thresholds_applied || project.thresholds || {}
+  const atRisk = numberOrDefault(thresholds.at_risk_delay_percent ?? thresholds.atRiskDelayPercent, 5)
+  const delayed = numberOrDefault(thresholds.delayed_percent ?? thresholds.delayedPercent, 15)
+  const budgetTolerance = numberOrDefault(thresholds.budget_overrun_vs_progress_percent ?? thresholds.budgetOverrunVsProgressPercent, 10)
   const scheduleVariancePercent = toFiniteNumber(result?.schedule_variance_percent) ?? positiveDifference(plannedProgress, actualProgress)
   const timelineElapsedPercent = toFiniteNumber(result?.timeline_elapsed_percent) ?? calculateTimelineElapsedPercent(project)
-  const status = result?.status || classifyProject(scheduleVariancePercent)
+  const status = result?.status || classifyProject(scheduleVariancePercent, atRisk, delayed)
   const milestones = deriveMilestones(project)
   const risks = Array.isArray(result?.risk_reasons) && result.risk_reasons.length > 0
     ? result.risk_reasons
-    : deriveProjectRisks(scheduleVariancePercent, actualProgress, budgetUsedPercent, milestones)
+    : deriveProjectRisks(scheduleVariancePercent, actualProgress, budgetUsedPercent, milestones, atRisk, budgetTolerance)
 
   return {
     status,
@@ -114,6 +119,9 @@ export function deriveProjectVisualModel (project = {}, result) {
     plannedProgress,
     actualProgress,
     budgetUsedPercent,
+    scheduleBarTone: result?.status === 'not_calculable' ? 'neutral' : toneForStatus(classifyProject(scheduleVariancePercent, atRisk, delayed)),
+    budgetBarTone: budgetUsedPercent === null ? 'neutral' : budgetUsedPercent > 100 ? 'danger' : actualProgress === null ? 'neutral' : budgetUsedPercent > actualProgress + budgetTolerance ? 'warning' : 'success',
+    budgetOverrunPercent: budgetUsedPercent === null ? null : round(Math.max(0, budgetUsedPercent - 100)),
     scheduleVariancePercent,
     timelineElapsedPercent,
     spi: ratio(actualProgress, plannedProgress),
@@ -126,6 +134,7 @@ export function deriveProjectVisualModel (project = {}, result) {
 }
 
 function toFiniteNumber (value) {
+  if (value === null || value === undefined || typeof value === 'boolean' || (typeof value === 'string' && value.trim() === '') || (typeof value !== 'number' && typeof value !== 'string')) return null
   const number = Number(value)
   return Number.isFinite(number) ? number : null
 }
@@ -174,10 +183,10 @@ function classifyOperational (adversePercent, deviationThreshold, criticalThresh
   return 'critical'
 }
 
-function classifyProject (scheduleVariancePercent) {
+function classifyProject (scheduleVariancePercent, atRisk = 5, delayed = 15) {
   if (scheduleVariancePercent === null) return 'not_calculable'
-  if (scheduleVariancePercent <= 5) return 'on_track'
-  if (scheduleVariancePercent <= 15) return 'at_risk'
+  if (scheduleVariancePercent <= atRisk) return 'on_track'
+  if (scheduleVariancePercent <= delayed) return 'at_risk'
   return 'delayed'
 }
 
@@ -236,10 +245,11 @@ function operationalImpactText (metricName = 'El indicador', status, adversePerc
 }
 
 function calculateBudgetUsedPercent (budget = {}) {
+  if (!budget || typeof budget !== 'object' || Array.isArray(budget)) return null
   const planned = toFiniteNumber(budget.planned_amount)
   const actual = toFiniteNumber(budget.actual_amount)
-  if (planned === null || actual === null || planned <= 0) return null
-  return round((actual / planned) * 100)
+  if (planned === null || actual === null || planned <= 0 || actual < 0) return null
+  return toFiniteNumber(round((actual / planned) * 100))
 }
 
 function calculateTimelineElapsedPercent (project = {}) {
@@ -250,10 +260,10 @@ function calculateTimelineElapsedPercent (project = {}) {
   return round(clamp(((asOf - start) / (end - start)) * 100, 0, 100))
 }
 
-function deriveProjectRisks (scheduleVariance, actualProgress, budgetUsed, milestones) {
+function deriveProjectRisks (scheduleVariance, actualProgress, budgetUsed, milestones, atRisk = 5, budgetTolerance = 10) {
   const risks = []
-  if (scheduleVariance !== null && scheduleVariance > 5) risks.push('schedule_variance')
-  if (budgetUsed !== null && actualProgress !== null && budgetUsed > actualProgress + 10) risks.push('budget_overrun')
+  if (scheduleVariance !== null && scheduleVariance > atRisk) risks.push('schedule_variance')
+  if (budgetUsed !== null && actualProgress !== null && budgetUsed > actualProgress + budgetTolerance) risks.push('budget_overrun')
   if (milestones.some(milestone => milestone.status === 'blocked')) risks.push('blocked_milestone')
   if (milestones.some(milestone => milestone.critical && milestone.isOverdue)) risks.push('critical_milestone_overdue')
   return risks.length > 0 ? risks : ['sin_riesgo_abierto']
@@ -271,7 +281,7 @@ function deriveMilestones (project = {}) {
     const due = Date.parse(milestone.due_date)
     const completed = Date.parse(milestone.completed_at)
     const effectiveEnd = Number.isNaN(completed) ? due : completed
-    const isOverdue = milestone.status !== 'completed' && !Number.isNaN(due) && !Number.isNaN(asOf) && due < asOf
+    const isOverdue = isMilestoneOverdue(milestone, project.as_of_date)
     const tone = milestone.status === 'completed'
       ? 'success'
       : milestone.status === 'blocked' || isOverdue
@@ -342,4 +352,19 @@ function buildMilestoneCalendar (project = {}, milestones = []) {
     label: new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(anchor),
     days
   }
+}
+
+function nonNegativeNumber (value) {
+  const number = toFiniteNumber(value)
+  return number !== null && number >= 0 ? number : null
+}
+
+function progressPercent (value) {
+  const number = nonNegativeNumber(value)
+  return number !== null && number <= 100 ? number : null
+}
+
+export function progressBarWidth (value, allowOverflow = false) {
+  const number = allowOverflow ? nonNegativeNumber(value) : progressPercent(value)
+  return number === null ? null : Math.min(100, number)
 }

@@ -1,3 +1,4 @@
+import { isMilestoneOverdue } from '../utils/projectMilestones.js'
 // src/tools/track_project_progress.js
 // Plan de implementacion gestionado por hitos de clausula. isoEvent: "project_progress_update".
 
@@ -52,7 +53,7 @@ function valueFor (input, snakeKey, camelKey) {
 }
 
 function numberOrDefault (value, fallback) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return value === undefined ? fallback : typeof value === 'number' && Number.isFinite(value) ? value : NaN
 }
 
 function round (value) {
@@ -61,9 +62,9 @@ function round (value) {
 
 function mergeThresholds (inputThresholds = {}) {
   return {
-    at_risk_delay_percent: numberOrDefault(inputThresholds.at_risk_delay_percent ?? inputThresholds.atRiskDelayPercent, DEFAULT_THRESHOLDS.atRiskDelayPercent),
-    delayed_percent: numberOrDefault(inputThresholds.delayed_percent ?? inputThresholds.delayedPercent, DEFAULT_THRESHOLDS.delayedPercent),
-    budget_overrun_vs_progress_percent: numberOrDefault(inputThresholds.budget_overrun_vs_progress_percent ?? inputThresholds.budgetOverrunVsProgressPercent, DEFAULT_THRESHOLDS.budgetOverrunVsProgressPercent)
+    at_risk_delay_percent: numberOrDefault(valueFor(inputThresholds, 'at_risk_delay_percent', 'atRiskDelayPercent'), DEFAULT_THRESHOLDS.atRiskDelayPercent),
+    delayed_percent: numberOrDefault(valueFor(inputThresholds, 'delayed_percent', 'delayedPercent'), DEFAULT_THRESHOLDS.delayedPercent),
+    budget_overrun_vs_progress_percent: numberOrDefault(valueFor(inputThresholds, 'budget_overrun_vs_progress_percent', 'budgetOverrunVsProgressPercent'), DEFAULT_THRESHOLDS.budgetOverrunVsProgressPercent)
   }
 }
 
@@ -76,6 +77,7 @@ function normalizeSource (source = {}) {
 }
 
 function normalizeMilestone (milestone = {}) {
+  milestone = milestone && typeof milestone === 'object' && !Array.isArray(milestone) ? milestone : {}
   return {
     milestone_id: valueFor(milestone, 'milestone_id', 'milestoneId'),
     name: milestone.name,
@@ -111,7 +113,7 @@ function normalizeInput (input = {}, asset = {}) {
     budget: normalizeBudget(input.budget),
     target_type: valueFor(input, 'target_type', 'targetType'),
     target_ids: valueFor(input, 'target_ids', 'targetIds'),
-    thresholds: input.thresholds || {},
+    thresholds: input.thresholds === undefined ? {} : input.thresholds,
     source: normalizeSource(input.source)
   }
 }
@@ -138,6 +140,14 @@ function getValidationWarnings (input) {
   if (isValidDate(input.planned_start_date) && isValidDate(input.planned_end_date) && Date.parse(input.planned_start_date) >= Date.parse(input.planned_end_date)) {
     warnings.push('planned_start_date must be before planned_end_date')
   }
+  if (input.milestones !== undefined && !Array.isArray(input.milestones)) {
+    warnings.push('milestones must be an array')
+  }
+  for (const [index, milestone] of (Array.isArray(input.milestones) ? input.milestones : []).entries()) {
+    if (!milestone.milestone_id || !milestone.name || !isValidDate(milestone.due_date) || !['pending', 'completed', 'blocked', 'cancelled'].includes(milestone.status)) {
+      warnings.push(`milestones[${index}] must be a milestone with an id, name, valid due date and status`)
+    }
+  }
   return warnings
 }
 
@@ -148,7 +158,6 @@ function classifySchedule (scheduleVariancePercent, thresholds) {
 }
 
 function evaluateMilestones (milestones = [], asOfDate) {
-  const asOf = Date.parse(asOfDate)
   const summary = {
     total: milestones.length,
     completed: 0,
@@ -163,9 +172,7 @@ function evaluateMilestones (milestones = [], asOfDate) {
     if (milestone.status === 'pending' || milestone.status === 'blocked') summary.pending += 1
     if (milestone.status === 'blocked') summary.blocked += 1
 
-    const dueDate = Date.parse(milestone.due_date)
-    const isOpen = milestone.status !== 'completed' && milestone.status !== 'cancelled'
-    if (isOpen && !Number.isNaN(dueDate) && dueDate < asOf) {
+    if (isMilestoneOverdue(milestone, asOfDate)) {
       summary.overdue += 1
       if (milestone.critical) summary.critical_overdue += 1
     }
@@ -176,13 +183,15 @@ function evaluateMilestones (milestones = [], asOfDate) {
 
 function calculateBudgetUsedPercent (budget, warnings) {
   if (!budget) return null
+  const validAmount = value => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value))
   const plannedAmount = Number(budget.planned_amount)
   const actualAmount = Number(budget.actual_amount)
-  if (!Number.isFinite(plannedAmount) || !Number.isFinite(actualAmount) || plannedAmount <= 0) {
-    warnings.push('budget requires planned_amount > 0 and numeric actual_amount')
+  const usedPercent = (actualAmount / plannedAmount) * 100
+  if (!validAmount(budget.planned_amount) || !validAmount(budget.actual_amount) || plannedAmount <= 0 || actualAmount < 0 || !Number.isFinite(usedPercent)) {
+    warnings.push('budget requires planned_amount > 0 and non-negative finite actual_amount')
     return null
   }
-  return round((actualAmount / plannedAmount) * 100)
+  return round(usedPercent)
 }
 
 function calculateTimelineElapsedPercent (input) {
@@ -339,7 +348,17 @@ function buildResult (input, thresholds) {
 
 export function evaluateProjectProgress (event) {
   const input = normalizeInput(event.data || {}, event.asset || {})
-  const thresholds = mergeThresholds(input.thresholds)
+  const validObject = input.thresholds !== null && typeof input.thresholds === 'object' && !Array.isArray(input.thresholds)
+  const thresholds = mergeThresholds(validObject ? input.thresholds : {})
+  const warnings = validObject
+    ? Object.entries(thresholds).filter(([key, value]) => key !== 'planned_zero_policy' && (!Number.isFinite(value) || value < 0)).map(([key]) => `thresholds.${key} must be a non-negative finite number`)
+    : ['thresholds must be an object']
+  if (thresholds.at_risk_delay_percent > thresholds.delayed_percent) warnings.push('thresholds.at_risk_delay_percent must be less than or equal to thresholds.delayed_percent')
+  if (warnings.length > 0) {
+    const result = buildNotCalculableResult(input, null, getMissingFields(input), warnings)
+    result.audit.decision_rationale = ['invalid thresholds; calculation skipped']
+    return result
+  }
   return buildResult(input, thresholds)
 }
 

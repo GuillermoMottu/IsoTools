@@ -2,7 +2,9 @@
 
 Trabajo local en `comm/sync_erp_data_local__compare_planned_vs_actual`.
 Este documento distingue lo probado localmente de la aceptación en Railway.
-No se ha desplegado esta versión ni publicado eventos en el bus productivo.
+El usuario autorizó el 2026-10-13 completar las tareas propias, incluyendo publicar
+en el fork y configurar/desplegar ambas tools mediante el workflow. El despliegue
+de esta versión está pendiente de verificación; no se han publicado eventos reales.
 
 ## Resultado de inspección con el token del workflow — 2026-10-13
 
@@ -54,12 +56,11 @@ publicaciones y trazabilidad, no de la recepción del cierre ERP ni del consumid
 federado nuevo. Para aceptar el checklist debe aparecer una cadena nueva con la
 entrada ERP y su correlación conservada, además de las URLs resueltas y salud actual.
 
-Siguiente preparación requerida: establecer la API URL oficial, conseguir que el dueño
-configure una clave central aceptada, preparar almacenamiento persistente para el cursor,
-desplegar los servicios nuevos y registrar sus URLs en el core. Después se podrá activar
-el consumidor con metas/contexto reales y verificar la cadena. Las modificaciones de
-servicios, variables, volúmenes y el despliegue no están incluidas en la autorización
-recibida para esta inspección.
+La inspección anterior precede a la nueva autorización. El workflow de despliegue
+establece la API URL oficial, conserva el volumen existente o crea uno en `/data`
+si no hay ninguno asociado y mantiene el consumidor pausado. No cambia API keys.
+Plataforma debe configurar una clave central aceptada y registrar las URLs en el core.
+Después se podrá activar el consumidor con metas/contexto reales y verificar la cadena.
 
 ## 1. Railway: servicios independientes
 
@@ -114,9 +115,12 @@ no muestra ese proyecto; ese resultado no determina el acceso mediante el token 
 - `inspect` (por defecto al ejecutarlo manualmente): consulta las variables de ambos
   servicios con el token, verifica la clave mediante un GET a la suscripción central
   y revisa `/health` sin credenciales. No despliega, publica eventos ni cambia variables.
-- `deploy`: exige API URL/clave funcional, configuración abierta, volumen `/data`, ruta
-  de estado compatible y URL de salud; después sube la tool, espera salud y verifica
-  la identidad y modo SSO de la versión desplegada.
+- `deploy`: prepara URL oficial, identidad, cookie y almacenamiento persistente,
+  conservando cualquier volumen y estado existentes. Un consumidor activo exige
+  clave funcional; una tool pausada puede desplegarse mientras se corrige la clave.
+  Exige configuración abierta y URL de salud; después espera la identidad y el SHA
+  exacto de la nueva versión y verifica SSO abierto. Un HTTP 200 de la versión
+  anterior no basta para aceptar el despliegue.
 
 `scripts/inspect_railway_tool.js` captura el JSON de variables de la CLI solamente
 en memoria. Los logs y el resumen del run muestran un informe limitado a indicadores
@@ -262,8 +266,8 @@ track, contrato KPI/proyecto e hitos; `node scripts/validate-platform-data.js` y
 Evidencia del 2026-10-13: ambas imágenes (`isotools-compare:checklist` y
 `isotools-track:checklist`) construidas y verificadas con `scripts/smoke_tool_image.js`.
 La integración HTTP/SSO pasó también dentro de la imagen Node 22, sin red externa.
-La validación de catálogo pasó con dos avisos: SPC sin subdominio (preexistente)
-y track sin dominio confirmado. `git diff --check` pasó.
+La validación de catálogo pasó con un aviso: SPC sin subdominio (preexistente).
+Track ya declara `subdomain: tpp` localmente. `git diff --check` pasó.
 
 Límites: un escritor por volumen; no hay failover ni soporte de múltiples réplicas.
 Un evento inválido bloquea la suscripción y requiere corregir el origen/configuración:

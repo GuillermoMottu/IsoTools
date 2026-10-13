@@ -34,7 +34,7 @@ export const meta = {
   name: 'Comparacion Plan vs Real',
   version: CALCULATION_VERSION,
   category: 'erp',
-  consumes: [],
+  consumes: ['ERP_SALES_PERIOD_CLOSED'],
   produces: ['PRODUCTION_VARIANCE_DETECTED']
 }
 
@@ -44,7 +44,7 @@ function valueFor (input, snakeKey, camelKey) {
 }
 
 function numberOrDefault (value, fallback) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return value === undefined ? fallback : typeof value === 'number' && Number.isFinite(value) ? value : NaN
 }
 
 function round (value) {
@@ -72,8 +72,8 @@ function inferPeriod (input) {
 
 function mergeThresholds (inputThresholds = {}) {
   return {
-    deviation_percent: numberOrDefault(inputThresholds.deviation_percent ?? inputThresholds.deviationPercent, DEFAULT_THRESHOLDS.deviationPercent),
-    critical_percent: numberOrDefault(inputThresholds.critical_percent ?? inputThresholds.criticalPercent, DEFAULT_THRESHOLDS.criticalPercent),
+    deviation_percent: numberOrDefault(valueFor(inputThresholds, 'deviation_percent', 'deviationPercent'), DEFAULT_THRESHOLDS.deviationPercent),
+    critical_percent: numberOrDefault(valueFor(inputThresholds, 'critical_percent', 'criticalPercent'), DEFAULT_THRESHOLDS.criticalPercent),
     planned_zero_policy: DEFAULT_THRESHOLDS.plannedZeroPolicy
   }
 }
@@ -87,6 +87,7 @@ function normalizeSource (source = {}) {
 }
 
 function normalizeMetric (metric = {}) {
+  metric = metric && typeof metric === 'object' && !Array.isArray(metric) ? metric : {}
   return {
     metric_id: valueFor(metric, 'metric_id', 'metricId'),
     name: metric.name,
@@ -113,7 +114,7 @@ function normalizeInput (input = {}, asset = {}) {
     period_start: valueFor(input, 'period_start', 'periodStart') || null,
     period_end: valueFor(input, 'period_end', 'periodEnd') || null,
     metrics: Array.isArray(input.metrics) ? input.metrics.map(normalizeMetric) : input.metrics,
-    thresholds: input.thresholds || {},
+    thresholds: input.thresholds === undefined ? {} : input.thresholds,
     source: normalizeSource(input.source)
   }
 }
@@ -376,6 +377,12 @@ function buildNotCalculableResult (input, thresholds, missingFields) {
 function buildResult (input, thresholds) {
   const missingFields = getMissingFields(input)
   if (missingFields.length > 0) return buildNotCalculableResult(input, thresholds, missingFields)
+  if (typeof input.as_of_date !== 'string' || Number.isNaN(Date.parse(input.as_of_date))) {
+    const result = buildNotCalculableResult(input, thresholds, [])
+    result.data_quality = buildDataQuality([], ['as_of_date must be a valid date'])
+    result.audit.decision_rationale = ['invalid as_of_date']
+    return result
+  }
 
   const metrics = input.metrics.map((metric, index) => calculateMetric(metric, index, thresholds))
   const allMissingFields = metrics.flatMap(metric => metric.missing_fields)
@@ -417,7 +424,18 @@ function buildResult (input, thresholds) {
 
 export function evaluatePlannedVsActual (event) {
   const input = normalizeInput(event.data || {}, event.asset || {})
-  const thresholds = mergeThresholds(input.thresholds)
+  const validObject = input.thresholds !== null && typeof input.thresholds === 'object' && !Array.isArray(input.thresholds)
+  const thresholds = mergeThresholds(validObject ? input.thresholds : {})
+  const warnings = validObject
+    ? Object.entries(thresholds).filter(([key, value]) => key !== 'planned_zero_policy' && (!Number.isFinite(value) || value < 0)).map(([key]) => `thresholds.${key} must be a non-negative finite number`)
+    : ['thresholds must be an object']
+  if (thresholds.deviation_percent > thresholds.critical_percent) warnings.push('thresholds.deviation_percent must be less than or equal to thresholds.critical_percent')
+  if (warnings.length > 0) {
+    const result = buildNotCalculableResult(input, null, getMissingFields(input))
+    result.data_quality = buildDataQuality(getMissingFields(input), warnings)
+    result.audit.decision_rationale = ['invalid thresholds; calculation skipped']
+    return result
+  }
   return buildResult(input, thresholds)
 }
 
