@@ -14,6 +14,14 @@ on:
           - all
           - compare_planned_vs_actual
           - track_project_progress
+      mode:
+        description: Inspect configuration or deploy
+        required: true
+        default: inspect
+        type: choice
+        options:
+          - inspect
+          - deploy
 
 concurrency:
   group: deploy-orca-tools-${{ github.ref }}
@@ -27,9 +35,12 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.tool == 'all' || inputs.tool == 'compare_planned_vs_actual' }}
 
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_COMPARE_TOKEN || secrets.RAILWAY_TOKEN }}
       RAILWAY_SERVICE: ${{ vars.COMPARE_PLANNED_VS_ACTUAL_RAILWAY_SERVICE || 'compare-planned-vs-actual' }}
       RAILWAY_DOCKERFILE_PATH: Docker/compare_planned_vs_actual.Dockerfile
+      TOOL_PAGE_ID: compare_planned_vs_actual
+      RAILWAY_CONFIG_FILE: Docker/compare_planned_vs_actual.railway.toml
+      DEPLOY_REQUESTED: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'deploy' }}
       HEALTH_URL: ${{ vars.COMPARE_PLANNED_VS_ACTUAL_HEALTH_URL || '' }}
 
     steps:
@@ -56,13 +67,26 @@ jobs:
           node-version: 22
 
       - name: Install Railway CLI
-        run: npm i -g @railway/cli
+        run: npm i -g @railway/cli@5.67.1
+
+      - name: Verify remote configuration and central API key
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: node scripts/inspect_railway_tool.js --require-deploy-config
+
+      - name: Inspect existing service without exposing secrets
+        if: ${{ env.DEPLOY_REQUESTED != 'true' }}
+        run: node scripts/inspect_railway_tool.js
+
+      - name: Select tool configuration for this upload
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: cp "$RAILWAY_CONFIG_FILE" railway.toml
 
       - name: Deploy
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: railway up --service "$RAILWAY_SERVICE" --ci
 
       - name: Smoke health
-        if: ${{ env.HEALTH_URL != '' }}
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: |
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
@@ -76,6 +100,10 @@ jobs:
           echo "::error::health URL did not return 200 after 5 minutes."
           exit 1
 
+      - name: Verify deployed tool identity and open SSO
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: node scripts/inspect_railway_tool.js --require-deployed-tool
+
   deploy_track:
     name: deploy track_project_progress
     runs-on: ubuntu-latest
@@ -83,9 +111,12 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.tool == 'all' || inputs.tool == 'track_project_progress' }}
 
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TRACK_TOKEN || secrets.RAILWAY_TOKEN }}
       RAILWAY_SERVICE: ${{ vars.TRACK_PROJECT_PROGRESS_RAILWAY_SERVICE || 'track-project-progress' }}
       RAILWAY_DOCKERFILE_PATH: Docker/track_project_progress.Dockerfile
+      TOOL_PAGE_ID: track_project_progress
+      RAILWAY_CONFIG_FILE: Docker/track_project_progress.railway.toml
+      DEPLOY_REQUESTED: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'deploy' }}
       HEALTH_URL: ${{ vars.TRACK_PROJECT_PROGRESS_HEALTH_URL || '' }}
 
     steps:
@@ -112,13 +143,26 @@ jobs:
           node-version: 22
 
       - name: Install Railway CLI
-        run: npm i -g @railway/cli
+        run: npm i -g @railway/cli@5.67.1
+
+      - name: Verify remote configuration and central API key
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: node scripts/inspect_railway_tool.js --require-deploy-config
+
+      - name: Inspect existing service without exposing secrets
+        if: ${{ env.DEPLOY_REQUESTED != 'true' }}
+        run: node scripts/inspect_railway_tool.js
+
+      - name: Select tool configuration for this upload
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: cp "$RAILWAY_CONFIG_FILE" railway.toml
 
       - name: Deploy
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: railway up --service "$RAILWAY_SERVICE" --ci
 
       - name: Smoke health
-        if: ${{ env.HEALTH_URL != '' }}
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: |
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)
@@ -131,3 +175,7 @@ jobs:
           done
           echo "::error::health URL did not return 200 after 5 minutes."
           exit 1
+
+      - name: Verify deployed tool identity and open SSO
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: node scripts/inspect_railway_tool.js --require-deployed-tool
