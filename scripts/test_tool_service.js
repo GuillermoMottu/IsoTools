@@ -28,25 +28,33 @@ try {
   assert.equal((await fetch(`${base}/health`)).status, 200)
   assert.equal((await fetch(`${base}/ready`)).status, 503)
   assert.equal((await fetch(`${base}/api/absent`)).status, 404)
+  const unauthorized = await fetch(`${base}/api/tool/status`, { redirect: 'manual' })
+  if (process.env.OIDC_ISSUER) {
+    assert.equal(unauthorized.status, 401)
+    assert.equal((await unauthorized.json()).error, 'authentication_required')
+  } else {
+    assert.equal(unauthorized.status, 200)
+    assert.equal((await fetch(`${base}/api/tool/compare_planned_vs_actual/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"input":{}}' })).status, 400)
+  }
   assert.equal((await fetch(`${base}/api/tool/compare_planned_vs_actual/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, process.env.OIDC_ISSUER ? 401 : 400)
   if (process.argv.includes('--sso')) {
-    assert.equal((await fetch(`${base}/analyses`)).status, 401)
+    assert.equal((await fetch(`${base}/api/analyses`)).status, 401)
     for (const route of ['/deep/link?x=1', '/index.html']) {
       const r = await fetch(`${base}${route}`, { redirect: 'manual' })
       assert.equal(r.status, 302)
       assert.equal(r.headers.get('location'), `/auth/login?return_to=${encodeURIComponent(route)}`)
     }
     const cookie = roles => `cpa_session=${signSession({ sub: 'test-user', name: 'Operator', roles, exp: Math.floor(Date.now() / 1000) + 60 }, process.env.SESSION_SECRET)}`
-    assert.equal((await fetch(`${base}/analyses`, { headers: { cookie: cookie([]) } })).status, 403)
-    assert.equal((await fetch(`${base}/analyses`, { headers: { cookie: cookie(['OperationsManager']) } })).status, 200)
-    assert.equal((await fetch(`${base}/analyses`, { headers: { cookie: cookie(['OperationsManager']) + 'tampered' } })).status, 401)
-    assert.equal((await fetch(`${base}/analyses`, { headers: { cookie: cookie(['Auditor']) } })).status, 200)
+    assert.equal((await fetch(`${base}/api/analyses`, { headers: { cookie: cookie([]) } })).status, 403)
+    assert.equal((await fetch(`${base}/api/analyses`, { headers: { cookie: cookie(['OperationsManager']) } })).status, 200)
+    assert.equal((await fetch(`${base}/api/analyses`, { headers: { cookie: cookie(['OperationsManager']) + 'tampered' } })).status, 401)
+    assert.equal((await fetch(`${base}/api/analyses`, { headers: { cookie: cookie(['Auditor']) } })).status, 200)
     assert.equal((await fetch(`${base}/api/tool/compare_planned_vs_actual/run`, { method: 'POST', headers: { cookie: cookie(['Auditor']), 'content-type': 'application/json' }, body: '{"input":{},"authorizedByRole":"OperationsManager"}' })).status, 403)
     console.log('SSO: health, JSON 401, deep links, roles, forged payload and signed sessions passed')
     stop()
   } else {
     assert.equal((await (await fetch(`${base}/auth/me`)).json()).mode, 'open')
-    assert.deepEqual(await (await fetch(`${base}/analyses`)).json(), {})
+    assert.deepEqual(await (await fetch(`${base}/api/analyses`)).json(), {})
     stop()
     assert.equal(resolveAuthConfig({}), null)
     assert.throws(() => resolveAuthConfig({ OIDC_ISSUER: 'https://idp.example' }), /SESSION_SECRET/)
@@ -56,7 +64,7 @@ try {
     const sale = subscriptionEvent(row(11), 'ERP_SALES_PERIOD_CLOSED')
     assert.throws(() => salesInput({ ...sale, data: { ...sale.data, periodEnd: '2026-02-31', period: '2026-09-28_2026-02-31' } }), /invalid_sales_period/)
     assert.throws(() => salesInput({ ...sale, asset: { ...sale.asset, plant_id: 'other-plant' } }), /invalid_sales_period/)
-    let rows = [row(11), row(12)]
+    let rows = [{ ...row(11), data: { ...row(11).data, actual: 124740 } }, row(12)]
     let failPost = true
     const outputs = []
     const queries = []
@@ -119,6 +127,16 @@ try {
     assert.equal(withoutTarget.data.source_period, '2026-09-28_2026-09-28')
     assert.equal(withoutTarget.causation_id, 'input-12')
     assert.equal(withoutTarget.correlation_id, 'sales-chain')
+    const cachedApp = await createToolApp({ ...appEnv, TOOL_STATE_DIR: path.join(temp, 'missing-plan') })
+    const cachedBase = await listen(http.createServer(cachedApp.app))
+    const records = await (await fetch(`${cachedBase}/api/analyses`)).json()
+    const storedInput = Object.values(records)[0]
+    const runCached = input => fetch(`${cachedBase}/api/tool/compare_planned_vs_actual/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }) })
+    const cachedResult = await runCached(storedInput)
+    assert.equal(cachedResult.status, 200)
+    assert.equal((await cachedResult.json()).result.status, 'sin_meta')
+    assert.equal((await runCached({ ...storedInput, metrics: [{ ...storedInput.metrics[0], actual: 999999 }] })).status, 400, 'edited data cannot borrow the stored ERP result')
+    cachedApp.stop()
     const afterMissingTarget = outputs.length
     await writeFile(business, JSON.stringify({ organization_id: 'TEST', sales_plans: [{ plant_id: 'plant_01', period: '2026-09-28_2026-09-28', planned: 'invalid', unit: 'MXN' }] }))
     const invalidPlan = await createToolConsumer({ ...settings, stateDir: path.join(temp, 'invalid-plan') })
@@ -133,8 +151,9 @@ try {
     assert.equal(consumer.snapshot().cursor, 12)
     const projectSettings = { ...settings, toolId: 'track_project_progress', stateDir: path.join(temp, 'project'), initialCursor: 0, fetcher: async () => new Response(JSON.stringify({ consumer: 'track_project_progress', consumes: ['KPI_REPORT_GENERATED'], events: [{ ...row(1), event_type: 'KPI_REPORT_GENERATED', data: { kpis: [] } }], next_seq: 1 })) }
     const project = await createToolConsumer(projectSettings)
-    assert.equal((await project.tick()).reason, 'input_not_calculable')
-    assert.equal(project.snapshot().cursor, 0)
+    assert.equal((await project.tick()).status, 'ready')
+    assert.equal(project.snapshot().cursor, 1)
+    assert.equal(project.snapshot().rejected['input-1'].reason, 'input_not_calculable')
     const projectOutputs = []
     const projectData = { organization_id: 'TEST', project_id: 'P-TEST', project_name: 'HTTP fixture', as_of_date: '2026-07-23T12:00:00Z', planned_start_date: '2026-07-01T00:00:00Z', planned_end_date: '2026-09-30T00:00:00Z', planned_progress_percent: 40, actual_progress_percent: 40, milestones: [] }
     const projectCycle = await createToolConsumer({ ...projectSettings, stateDir: path.join(temp, 'project-cycle'), fetcher: async (url, options) => {

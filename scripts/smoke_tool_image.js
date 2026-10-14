@@ -15,7 +15,7 @@ try {
   const shell = await fetch(`${base}/`)
   assert.equal(shell.status, 200)
   assert.match(await shell.text(), /<html/)
-  const recordRoute = process.env.TOOL_PAGE_ID === 'compare_planned_vs_actual' ? 'analyses' : 'records'
+  const recordRoute = process.env.TOOL_PAGE_ID === 'compare_planned_vs_actual' ? 'api/analyses' : 'api/records'
   assert.deepEqual(await (await fetch(`${base}/${recordRoute}`)).json(), {})
   const assets = path.join(process.env.WEB_DIST_DIR, 'assets')
   for (const file of await readdir(assets)) {

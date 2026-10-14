@@ -42,7 +42,3 @@ export function requestErrorLabel (status) {
 export function localToday (date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
-
-export function saveProjectMilestones (projectId, milestones) {
-  return postJson('/project-milestones', { project_id: projectId, milestones })
-}

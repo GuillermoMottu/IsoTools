@@ -74,6 +74,27 @@ export function stateDirectoryIsPersistent (volumeList, service, stateDirectory 
     (stateDirectory === volume.mountPath || stateDirectory.startsWith(`${volume.mountPath}/`)))
 }
 
+export async function inspectFrontendBundle (variables, healthUrl, fetcher = fetch) {
+  const report = { frontend_bundle_checked: false, frontend_key_leak: null, frontend_actual_key_checked: false }
+  try {
+    const origin = new URL(healthUrl).origin
+    const shell = await fetcher(origin, { redirect: 'error', signal: AbortSignal.timeout(15000) })
+    if (!shell.ok || !shell.headers.get('content-type')?.includes('text/html')) return report
+    const html = await shell.text()
+    const paths = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)].map(match => new URL(match[1], origin)).filter(url => url.origin === origin && url.pathname.startsWith('/assets/'))
+    if (paths.length === 0) return report
+    const keys = [variables.ISOTOOLS_API_KEY, variables.TOOL_API_KEY].filter(value => typeof value === 'string' && value.length >= 8)
+    let leak = false
+    for (const url of paths) {
+      const response = await fetcher(url.href, { redirect: 'error', signal: AbortSignal.timeout(15000) })
+      if (!response.ok) return report
+      const script = await response.text()
+      leak ||= /ISOTOOLS_API_KEY|TOOL_API_KEY|CF_ACCESS|erp-planta1|MICROSIP/.test(script) || keys.some(key => script.includes(key.slice(0, 8)))
+    }
+    return { frontend_bundle_checked: true, frontend_key_leak: leak, frontend_actual_key_checked: typeof variables.ISOTOOLS_API_KEY === 'string' && variables.ISOTOOLS_API_KEY.length >= 8 }
+  } catch { return report }
+}
+
 export function hasDataVolume (volumeList, service) {
   return stateDirectoryIsPersistent(volumeList, service, '/data')
 }
@@ -98,6 +119,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       variables = railwayJson(['variable', 'list', '--service', process.env.RAILWAY_SERVICE, '--json'])
     } catch { throw new Error('railway_variables_query_failed') }
     const report = await inspectConnection(variables, process.env.TOOL_PAGE_ID, process.env.HEALTH_URL)
+    if (report.health_url && report.deployed_auth_mode_open) Object.assign(report, await inspectFrontendBundle(variables, report.health_url))
     try {
       const volumeList = railwayJson(['volume', '--service', process.env.RAILWAY_SERVICE, 'list', '--json'])
       report.volume_mounted_at_data = hasDataVolume(volumeList, process.env.RAILWAY_SERVICE)
@@ -109,8 +131,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (report.health_url && process.env.GITHUB_ENV) await appendFile(process.env.GITHUB_ENV, `HEALTH_URL=${report.health_url}\n`)
     if (process.argv.includes('--require-deploy-config') && !deploymentConfigurationReady(report)) throw new Error('deployment_configuration_incomplete')
     if (process.argv.includes('--require-deployed-tool') && (!report.deployed_tool_identity_matches || !report.deployed_auth_mode_open || report.deployed_build_sha !== process.env.GITHUB_SHA)) throw new Error('deployed_tool_verification_failed')
+    if (process.argv.includes('--require-deployed-tool') && (!report.frontend_bundle_checked || report.frontend_key_leak !== false || !report.frontend_actual_key_checked)) throw new Error('frontend_bundle_unsafe_or_unverified')
   } catch (error) {
-    const safe = ['missing_workflow_configuration', 'railway_variables_query_failed', 'deployment_configuration_incomplete', 'deployed_tool_verification_failed', 'invalid_configuration_response', 'invalid_health_url'].includes(error.message) ? error.message : 'railway_inspection_failed'
+    const safe = ['missing_workflow_configuration', 'railway_variables_query_failed', 'deployment_configuration_incomplete', 'deployed_tool_verification_failed', 'frontend_bundle_unsafe_or_unverified', 'invalid_configuration_response', 'invalid_health_url'].includes(error.message) ? error.message : 'railway_inspection_failed'
     console.error(safe)
     process.exitCode = 1
   }

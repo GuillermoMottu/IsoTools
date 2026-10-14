@@ -33,7 +33,9 @@ Además, upstream documenta en `docs/ERP_CENTRAL.md` y la comunicación de cierr
 la meta no viene del ERP. Se corrigió nuestra divergencia: un cierre válido sin meta
 publica `status: sin_meta`, valor real y desviaciones null, y avanza el cursor solo
 después del ACK. No exige inventar organización/meta para publicar ese hecho.
-Metas configuradas inválidas y eventos inválidos siguen bloqueando el lote.
+Metas configuradas inválidas conservan el cursor. Las entradas inválidas se conservan
+en `rejected`, se registran y se avanza el cursor, como pide el runbook.
+La evidencia más reciente está en [RESULTADOS_RUNBOOK_COMPARE_TRACK.md](RESULTADOS_RUNBOOK_COMPARE_TRACK.md).
 Track sigue requiriendo contexto real para emitir una alerta de proyecto.
 Se revisó por GET el evento disponible en la suscripción de track: `data` contiene
 solo `kpis`, `period`, `plantId`. El evaluador confirmó `not_calculable` por ausencia
@@ -357,6 +359,7 @@ La validación de catálogo pasó con un aviso: SPC sin subdominio (preexistente
 Track ya declara `subdomain: tpp` localmente. `git diff --check` pasó.
 
 Límites: un escritor por volumen; no hay failover ni soporte de múltiples réplicas.
-Un evento inválido bloquea la suscripción y requiere corregir el origen/configuración:
-no se elimina ni se salta silenciosamente. Los registros se conservan en JSON;
+Un evento inválido queda conservado en `rejected` con motivo y fecha, genera log y
+permite avanzar la suscripción. Una configuración inválida requiere corrección y
+conserva el cursor. Los registros se conservan en JSON;
 usar un almacén transaccional y una política de retención cuando crezca el volumen.

@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { TOOL_CONTRACTS, createToolConsumer } from './services/toolConsumer.js'
-import { attachCaller, authEnabled, authMode, gateway, requireCaller, requireRole, requireBrowserSession, describeSession } from './tool-auth/index.js'
+import { attachCaller, authEnabled, authMode, gateway, requireCaller, requireRole, requireBrowserSession, describeSession, bindActor } from './tool-auth/index.js'
 import { runComparePlannedVsActualTool, runTrackProjectProgressTool } from './services/compareTrackDemoService.js'
 import { rateLimit } from './middleware/rateLimit.js'
 
@@ -31,13 +31,22 @@ export async function createToolApp (env = process.env) {
   if (authEnabled) {
     for (const route of ['login', 'callback', 'logout']) app.get(`/auth/${route}`, (req, res) => gateway.handleRoute(req, res, route))
   }
-  app.get(toolId === 'compare_planned_vs_actual' ? '/analyses' : '/records', requireCaller, requireRole('OperationsManager', 'Auditor'), (req, res) => res.set('cache-control', 'no-store').json(consumer.snapshot().records))
+  app.get(toolId === 'compare_planned_vs_actual' ? '/api/analyses' : '/api/records', requireCaller, requireRole('OperationsManager', 'Auditor'), (req, res) => res.set('cache-control', 'no-store').json(consumer.snapshot().records))
   app.get('/api/tool/status', requireCaller, requireRole('OperationsManager', 'Auditor'), (req, res) => res.set('cache-control', 'no-store').json(consumer.snapshot()))
   app.post(`/api/tool/${toolId}/run`, requireCaller, requireRole('OperationsManager'), rateLimit(), (req, res) => {
     // This endpoint evaluates only; automatic publication belongs to the consumer.
     if (!req.body || !Object.hasOwn(req.body, 'input') || !req.body.input || typeof req.body.input !== 'object' || Array.isArray(req.body.input)) return res.status(400).json({ error: 'explicit_input_required' })
+    const command = bindActor(req.caller, { input: req.body.input, actor: { subject: null, role: null } }, { 'actor.subject': 'subject', 'actor.role': 'role' })
+    console.log(JSON.stringify({ tool: toolId, action: 'evaluation_requested', caller_kind: req.caller.kind, actor: command.actor }))
+    const stored = consumer.snapshot()
+    const id = req.body.input.analysis_id
+    if (toolId === 'compare_planned_vs_actual' && stored.evaluations[id]?.status === 'sin_meta' && JSON.stringify(stored.records[id]) === JSON.stringify(req.body.input)) {
+      return res.json({ status: 'ok', tool: toolId, input: stored.records[id], result: { ...stored.evaluations[id], audit: { ...stored.evaluations[id].audit, evaluated_by: command.actor } }, emitted_event: null, validation: [] })
+    }
     const run = toolId === 'compare_planned_vs_actual' ? runComparePlannedVsActualTool : runTrackProjectProgressTool
-    res.json(run({ input: req.body.input }))
+    const evaluation = run({ input: command.input })
+    evaluation.result.audit = { ...evaluation.result.audit, evaluated_by: command.actor }
+    res.status(evaluation.result.status === 'not_calculable' ? 400 : 200).json(evaluation)
   })
   app.use('/api', (req, res) => res.status(404).json({ error: 'not_found' }))
   const dist = path.resolve(env.WEB_DIST_DIR || 'demo-frontend/dist')
@@ -52,7 +61,7 @@ export async function createToolApp (env = process.env) {
   let timer
   async function poll () {
     await consumer.tick()
-    if (!stopped) timer = setTimeout(poll, 10000)
+    if (!stopped) timer = setTimeout(poll, consumer.readiness().retry_after_ms || 10000)
   }
   if (enabled) void poll()
   return { app, consumer, stop: () => { stopped = true; clearTimeout(timer) } }

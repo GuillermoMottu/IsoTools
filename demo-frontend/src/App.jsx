@@ -18,7 +18,7 @@ import {
   Tab,
   Table
 } from './components/controlRoom.jsx'
-import { runComparePlannedVsActual, runTrackProjectProgress, saveProjectMilestones, localToday } from './api.js'
+import { runComparePlannedVsActual, runTrackProjectProgress, localToday } from './api.js'
 import { useErpRecord, erpSummary } from './useErpRecord.js'
 import { cellError, explainResult, fieldError, fieldName, confidenceLabel, warningText, unitLabel, unitCode } from './resultExplanation.js'
 import { useToolEvaluation } from './useToolEvaluation.js'
@@ -32,7 +32,7 @@ const TOOLS = {
     id: 'compare_planned_vs_actual',
     path: '/compare_planned_vs_actual',
     label: 'Comparación plan vs. real',
-    clause: '9.1.3 - análisis y evaluación',
+    clause: '9.1.1 - seguimiento y medición',
     eyebrow: 'producción · metas y resultados',
     description: 'Compara tus metas con los resultados reales e identifica desviaciones.',
     icon: <Activity size={18} />,
@@ -43,7 +43,7 @@ const TOOLS = {
     id: 'track_project_progress',
     path: '/track_project_progress',
     label: 'Seguimiento de avance de proyecto',
-    clause: '6.3 - planificación de cambios',
+    clause: '6.2 - seguimiento de objetivos',
     eyebrow: 'proyecto · avance y riesgo',
     description: 'Evalúa el avance, presupuesto e hitos para anticipar riesgo de proyecto.',
     icon: <Briefcase size={18} />,
@@ -59,6 +59,7 @@ const STATUS_LABELS = {
   at_risk: 'En riesgo',
   delayed: 'Atrasado',
   not_calculable: 'No calculable',
+  sin_meta: 'Sin meta',
   pending: 'Pendiente'
 }
 
@@ -75,7 +76,8 @@ const ACTION_LABELS = {
   open_recovery_plan: 'Abrir plan de recuperación',
   notify_project_owner: 'Notificar responsable del proyecto',
   complete_required_data: 'Completar datos requeridos',
-  review_input_quality: 'Revisar calidad de captura'
+  review_input_quality: 'Revisar calidad de captura',
+  define_sales_target: 'Definir meta de ventas'
 }
 
 const RISK_LABELS = {
@@ -131,7 +133,7 @@ function ErpTool ({ tool }) {
   const project = tool.id === 'track_project_progress'
   const id = record?.[project ? 'project_id' : 'analysis_id'] || requested
   return <div className="page-stack">
-    <Panel title={project ? 'Proyecto' : 'Análisis'} subtitle="Resumen de los registros del ERP. Selecciona uno para consultar su evaluación.">
+    <Panel title={project ? 'Proyecto' : 'Análisis'} subtitle="Registros recibidos por la tool. Selecciona uno para consultar su evaluación.">
       {!loading && !error ? <div className="metrics-grid erp-summary">{erpSummary(records, tool.id).map(item => <Metric key={item.label} label={item.label} value={item.value} hint={item.hint} />)}</div> : null}
       <Field label={project ? 'Seleccionar proyecto' : 'Seleccionar análisis'}>
         <select className="input" value={id} disabled={loading || Object.keys(records).length === 0} onChange={event => setRequested(event.target.value)}>
@@ -141,9 +143,10 @@ function ErpTool ({ tool }) {
         </select>
       </Field>
     </Panel>
-    {loading ? <Loading label="Leyendo datos del ERP" /> : error ? <ErrorState title="No se pudo sincronizar con el ERP" detail={error} /> : record
+    {record ? <p className="source-note">{record.test ? 'Datos de prueba · ' : ''}Fuente: {record.source?.source_system === 'microsip' ? 'ERP Microsip' : record.source?.source_system || 'No disponible'} · actualizado {erpDate(record.source?.source_extracted_at)}</p> : null}
+    {loading ? <Loading label="Leyendo registros" /> : error ? <ErrorState title="No se pudieron consultar los registros" detail={error} /> : record
       ? project ? <TrackPage key={JSON.stringify(record)} tool={tool} initialInput={record} /> : <ComparePage key={JSON.stringify(record)} tool={tool} initialInput={record} />
-      : <EmptyState title={Object.keys(records).length === 0 ? project ? 'Aún no hay proyectos' : 'Aún no hay análisis' : requested ? 'Registro no disponible' : 'Selecciona un registro'} detail={Object.keys(records).length === 0 ? 'Los registros aparecerán aquí cuando se guarden en el ERP.' : requested ? 'La referencia solicitada no existe en el ERP.' : 'Selecciona un registro existente para consultar su evaluación.'} />}
+      : <EmptyState title={Object.keys(records).length === 0 ? project ? 'Aún no hay proyectos' : 'Aún no hay análisis' : requested ? 'Registro no disponible' : 'Selecciona un registro'} detail={Object.keys(records).length === 0 ? 'Los registros aparecerán cuando llegue un evento a la tool.' : requested ? 'La referencia solicitada no está disponible.' : 'Selecciona un registro existente para consultar su evaluación.'} />}
   </div>
 }
 
@@ -190,7 +193,7 @@ function ComparePage ({ tool, initialInput }) {
               <ErpValue label="Referencia del análisis" value={input.analysis_id} />
               <ErpValue label="Planta" value={input.plant_id} />
               <ErpValue label="Fecha de corte" value={erpDate(input.as_of_date)} />
-              <ErpValue label="Periodo" value={{ daily: 'Diario', weekly: 'Semanal', monthly: 'Mensual' }[input.period] || 'No disponible'} />
+              <ErpValue label="Periodo" value={{ daily: 'Diario', weekly: 'Semanal', monthly: 'Mensual' }[input.period] || input.period || 'No disponible'} />
               <ErpValue label="Umbral de desviación (%)" value={input.thresholds?.deviation_percent ?? input.thresholds?.deviationPercent ?? '5 (predeterminado)'} />
               <ErpValue label="Umbral crítico (%)" value={input.thresholds?.critical_percent ?? input.thresholds?.criticalPercent ?? '15 (predeterminado)'} />
             </div>
@@ -220,15 +223,14 @@ function ComparePage ({ tool, initialInput }) {
 
 function TrackPage ({ tool, initialInput }) {
   const evaluate = useCallback(async ({ input }) => {
-    if (JSON.stringify(input.milestones || []) !== JSON.stringify(initialInput.milestones || [])) await saveProjectMilestones(input.project_id, input.milestones || [])
     return runTrackProjectProgress({ input })
-  }, [initialInput])
-  const evaluation = useToolEvaluation(() => ({ ...structuredClone(initialInput), actual_progress_percent: completedMilestonePercent(initialInput.milestones) }), evaluate)
+  }, [])
+  const evaluation = useToolEvaluation(() => ({ ...structuredClone(initialInput), actual_progress_percent: completedMilestonePercent(initialInput.milestones) ?? initialInput.actual_progress_percent }), evaluate)
   const { input, response, loading, error } = evaluation
   function setInput (update) {
     evaluation.setInput(current => {
       const next = typeof update === 'function' ? update(current) : update
-      return { ...next, actual_progress_percent: completedMilestonePercent(next.milestones) }
+      return { ...next, actual_progress_percent: completedMilestonePercent(next.milestones) ?? initialInput.actual_progress_percent }
     })
   }
   const evaluationDate = response?.input?.as_of_date || localToday()
@@ -287,7 +289,7 @@ function TrackPage ({ tool, initialInput }) {
 
           <Panel
             title="Hitos"
-            subtitle="El avance real corresponde a los hitos completados. Los hitos cancelados no cuentan."
+            subtitle="Los cambios ajustan esta evaluación y no modifican la fuente. Los hitos cancelados no cuentan."
             actions={<Button onClick={() => addMilestone(setInput)}><Plus size={14} /> Agregar</Button>}
           >
             <MilestonesEditor milestones={input.milestones || []} checked={Boolean(result)} setInput={setInput} />

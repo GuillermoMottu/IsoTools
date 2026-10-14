@@ -442,12 +442,6 @@
     "descriptionEn": "Compares planned metrics against actual execution with traceability, data quality and configurable rules.",
     "inputSchema": {
       "type": "object",
-      "required": [
-        "organization_id",
-        "analysis_id",
-        "as_of_date",
-        "metrics"
-      ],
       "properties": {
         "organization_id": {
           "type": "string",
@@ -519,10 +513,17 @@
         },
         "period": {
           "type": "string",
-          "enum": [
-            "daily",
-            "weekly",
-            "monthly"
+          "anyOf": [
+            {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            },
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}(?:_\\d{4}-\\d{2}-\\d{2})?$"
+            }
           ]
         },
         "metrics": {
@@ -631,8 +632,57 @@
               "format": "date-time"
             }
           }
+        },
+        "actual": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "pattern": "^[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)$"
+            }
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "organization_id",
+            "analysis_id",
+            "as_of_date",
+            "metrics"
+          ]
+        },
+        {
+          "required": [
+            "module",
+            "periodStart",
+            "periodEnd",
+            "period",
+            "plantId",
+            "actual",
+            "unit"
+          ],
+          "properties": {
+            "module": {
+              "const": "sales"
+            },
+            "plantId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
     },
     "outputSchema": {
       "type": "object",
@@ -781,7 +831,9 @@
     "produces": [
       "PRODUCTION_VARIANCE_DETECTED"
     ],
-    "consumes": ["ERP_SALES_PERIOD_CLOSED"]
+    "consumes": [
+      "ERP_SALES_PERIOD_CLOSED"
+    ]
   },
   {
     "id": "detect_production_deviation",

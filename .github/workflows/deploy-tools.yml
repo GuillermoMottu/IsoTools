@@ -22,6 +22,7 @@ on:
         options:
           - inspect
           - deploy
+          - validate
 
 concurrency:
   group: deploy-orca-tools-${{ github.ref }}
@@ -32,7 +33,7 @@ jobs:
     name: deploy compare_planned_vs_actual
     runs-on: ubuntu-latest
 
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.tool == 'all' || inputs.tool == 'compare_planned_vs_actual' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.mode != 'validate' && (inputs.tool == 'all' || inputs.tool == 'compare_planned_vs_actual')) }}
 
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_COMPARE_TOKEN || secrets.RAILWAY_TOKEN }}
@@ -103,7 +104,7 @@ jobs:
     name: deploy track_project_progress
     runs-on: ubuntu-latest
 
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.tool == 'all' || inputs.tool == 'track_project_progress' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.mode != 'validate' && (inputs.tool == 'all' || inputs.tool == 'track_project_progress')) }}
 
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TRACK_TOKEN || secrets.RAILWAY_TOKEN }}
@@ -169,3 +170,22 @@ jobs:
       - name: Verify deployed tool identity and open SSO
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/inspect_railway_tool.js --require-deployed-tool
+
+  validate_bus:
+    name: Validate marked runbook events on central bus
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'validate' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install tool dependencies
+        run: |
+          corepack enable
+          pnpm install --prod --frozen-lockfile
+      - name: Verify marked QA inputs, publications, restart and correlation
+        env:
+          ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
+          TOOL_SELECTED: ${{ inputs.tool }}
+        run: node scripts/verify_runbook_bus.js

@@ -10,7 +10,7 @@ export function AppShell ({
   children,
   healthPath = '/health',
   sessionPath = '/auth/me',
-  dashboardUrl = import.meta.env.VITE_DASHBOARD_URL || '/tools'
+  dashboardUrl = import.meta.env.VITE_DASHBOARD_URL || 'https://api-events.orcalabs.mx'
 }) {
   const online = useHealth(healthPath)
   const session = useSession(sessionPath)
@@ -104,14 +104,14 @@ function SessionChip ({ session }) {
   if (!session) return null
   if (!session.authenticated) {
     if (session.mode !== 'open') return null
-    return <Badge tone="warn">Entorno de demostración</Badge>
+    return <Badge tone="warn">Modo abierto — sin autenticación</Badge>
   }
 
   const user = session.user || {}
   return (
     <span className="session-chip">
       <span>{user.displayName || 'Sesión'}</span>
-      <Mono>{{ 'platform.admin': 'Administrador de plataforma', 'platform.auditor': 'Auditor', 'quality.director': 'Director de calidad', 'quality.technical-authority': 'Autoridad técnica', 'quality.manager': 'Gerente de calidad', 'quality.engineer': 'Ingeniero de calidad', 'maintenance.manager': 'Gerente de mantenimiento', 'maintenance.technician': 'Técnico de mantenimiento', 'operations.manager': 'Gerente de operaciones', operator: 'Operador' }[user.role] || 'Rol no disponible'}</Mono>
+      <Mono>{{ OperationsManager: 'Gerente de operaciones', Auditor: 'Auditor', 'platform.admin': 'Administrador de plataforma', 'platform.auditor': 'Auditor', 'quality.director': 'Director de calidad', 'quality.technical-authority': 'Autoridad técnica', 'quality.manager': 'Gerente de calidad', 'quality.engineer': 'Ingeniero de calidad', 'maintenance.manager': 'Gerente de mantenimiento', 'maintenance.technician': 'Técnico de mantenimiento', 'operations.manager': 'Gerente de operaciones', operator: 'Operador' }[user.role] || 'Rol no disponible'}</Mono>
       <a href="/auth/logout" title="Cerrar sesion">
         <LogOut size={14} aria-hidden="true" />
         <span className="sr-only">Cerrar sesion</span>

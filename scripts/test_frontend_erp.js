@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { readErpRecords, selectErpRecord } from '../demo-frontend/src/useErpRecord.js'
 const records = { P1: { project_id: 'P1', organization_id: 'ERP', project_name: 'Real' }, P2: { project_id: 'P2' } }
 const fetcher = async (path, options) => {
-  assert.equal(path, '/records')
+  assert.equal(path, '/api/records')
   assert.equal(options.cache, 'no-store')
   return { ok: true, json: async () => records }
 }
@@ -19,7 +19,7 @@ for (const body of [null, [], { P1: { project_id: 'P2' } }]) {
   await assert.rejects(readErpRecords('track_project_progress', async () => ({ ok: true, json: async () => body })))
 }
 assert.deepEqual(await readErpRecords('compare_planned_vs_actual', async path => {
-  assert.equal(path, '/analyses')
+  assert.equal(path, '/api/analyses')
   return { ok: true, json: async () => ({ A1: { analysis_id: 'A1' } }) }
 }), { A1: { analysis_id: 'A1' } })
 const app = readFileSync('demo-frontend/src/App.jsx', 'utf8')

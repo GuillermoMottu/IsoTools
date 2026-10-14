@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { inspectConfiguration, inspectConnection, hasDataVolume } from './inspect_railway_tool.js'
+import { inspectConfiguration, inspectConnection, hasDataVolume, inspectFrontendBundle } from './inspect_railway_tool.js'
 
 const vars = { ISOTOOLS_API_URL: 'https://api-events.orcalabs.mx/api/v1', ISOTOOLS_API_KEY: 'secret-fixture-not-for-logs', RAILWAY_PUBLIC_DOMAIN: 'fixture.up.railway.app', RAILWAY_VOLUME_MOUNT_PATH: '/data', SESSION_SECRET: 'another-secret-fixture' }
 const calls = []
@@ -34,3 +34,16 @@ assert.equal(hasDataVolume({ volumes: [{ serviceName: 'other', mountPath: '/data
 assert.equal(hasDataVolume({ volumes: [{ serviceName: 'compare-planned-vs-actual', mountPath: '/data', isPendingDeletion: true }] }, 'compare-planned-vs-actual'), false)
 assert.equal(hasDataVolume({ volumes: [] }, 'compare-planned-vs-actual'), false)
 console.log('Railway inspection: GET only, central credential check, anonymous health and secret-free reports PASS')
+for (const leak of [false, true]) {
+  const report = await inspectFrontendBundle(vars, 'https://cpa.orcalabs.mx/health', async (url, options) => {
+    assert.equal(options.headers, undefined, 'public assets never receive a key')
+    assert.ok(url.startsWith('https://cpa.orcalabs.mx'))
+    return url.endsWith('/assets/app.js')
+      ? new Response(leak ? vars.ISOTOOLS_API_KEY.slice(0, 8) : 'console.log("safe")')
+      : new Response('<html><script src="/assets/app.js"></script><script src="https://external.invalid/a.js"></script></html>', { headers: { 'content-type': 'text/html' } })
+  })
+  assert.equal(report.frontend_bundle_checked, true)
+  assert.equal(report.frontend_actual_key_checked, true)
+  assert.equal(report.frontend_key_leak, leak)
+  assert.ok(!JSON.stringify(report).includes(vars.ISOTOOLS_API_KEY))
+}

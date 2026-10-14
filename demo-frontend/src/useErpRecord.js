@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 
 export async function readErpRecords (toolId, fetcher = fetch, signal) {
   const project = toolId === 'track_project_progress'
-  const response = await fetcher(project ? '/records' : '/analyses', { signal, cache: 'no-store' })
+  const response = await fetcher(project ? '/api/records' : '/api/analyses', { signal, cache: 'no-store', credentials: 'include' })
   if (!response.ok) throw new Error('No se pudieron cargar los datos del ERP')
   const records = await response.json()
   if (!records || typeof records !== 'object' || Array.isArray(records)) throw new Error('Respuesta del ERP inv\u00e1lida')

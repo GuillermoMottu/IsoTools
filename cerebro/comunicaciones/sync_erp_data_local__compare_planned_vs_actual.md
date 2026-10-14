@@ -26,12 +26,14 @@ y causación del evento de entrada. La categoría del sobre es `productivity` (I
 Sin meta de ventas, la tool publica el valor real con `status: sin_meta`,
 `deviationPercent: null` y `details.planned: null`, como define `docs/ERP_CENTRAL.md`
 de upstream. No requiere inventar una organización para publicar ese hecho.
-Un dato ERP inválido o una meta configurada inválida conserva el cursor anterior;
-no se convierte en un caso `sin_meta` para saltar el error.
+Un dato ERP inválido se conserva en `rejected`, se registra y permite avanzar el
+cursor según el runbook. Una meta configurada inválida conserva el cursor anterior.
 El productor ERP local de esta rama no implementa todavía el cierre de ventas de upstream;
 la integración productiva depende del productor desplegado por el equipo de conexión.
 
 ## Bitácora de la comunicación
+
+- [2026-10-13] (codex) Runbook: acepta cantidades ERP numéricas en string y fecha simple; deduplica periodo y actualiza el mismo registro al cambiar el cierre. Entrada inválida queda durable en `rejected` y avanza cursor; configuración inválida/reintento retiene el cursor. Backoff creciente hasta 300 s. Pruebas de reinicio y ACK perdido pasan en Node 22.
 
 - [2026-10-13] (codex) Registrada rule-conn-001 y consumo de cierre ERP. Agregado adaptador de ventas y consumidor federado con cursor durable, publicación idempotente y bloqueo explícito ante datos insuficientes.
 - [2026-10-13] (codex) Desplegado consumidor aislado en cpa.orcalabs.mx con SSO abierto y volumen persistente. Permanece pausado: clave central devuelve 401 y falta meta/organización real. Sin publicaciones productivas; registro y delegación del core pendientes. Evidencia y pasos de activación en docs/CHECKLIST_COMPARE_TRACK.md.

@@ -58,6 +58,8 @@ tags: [comunicacion, KPI_REPORT_GENERATED]
 ```
 
 ## Bitacora de la comunicacion
+
+- [2026-10-13] (codex) Runbook: contexto de proyecto recibido se normaliza sin inventar ID, fechas o avance; una entrada no calculable se conserva en `rejected` y avanza cursor. Contexto completo se prueba con datos QA marcados, no acredita datos reales del ERP.
 <!-- Cada cambio en el contrato entre estas dos tools se anota aqui.
      Asi el programador del otro lado ve que cambio sin leer el codigo.
      Formato:  - [YYYY-MM-DD] (quien) que cambio en el payload/condicion y por que -->

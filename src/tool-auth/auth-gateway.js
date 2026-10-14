@@ -44,6 +44,11 @@ export function createAuthGateway (config) {
     if (!discovered) {
       discovered = oidc
         .discovery(config.issuer, config.clientId, config.clientSecret)
+        .then((asConfig) => {
+          // openid-client otherwise relies on TLS for tokens received from the token endpoint.
+          oidc.enableNonRepudiationChecks(asConfig);
+          return asConfig;
+        })
         .catch((error) => {
           // Suelta la promesa rechazada para que el siguiente request reintente en
           // vez de cachear el fallo para siempre.
