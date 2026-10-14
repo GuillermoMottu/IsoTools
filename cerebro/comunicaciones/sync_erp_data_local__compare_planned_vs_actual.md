@@ -33,6 +33,8 @@ la integración productiva depende del productor desplegado por el equipo de con
 
 ## Bitácora de la comunicación
 
+- [2026-10-13] (codex) Resuelto registro de ambas URLs en core. Activación 38506459810: consumidores Railway activos, ready 200, inicio en últimos cursores sin replay histórico. QA 38506668863 fue consumida por los servicios desplegados: registro visible, salida 201 y cadena verificada. No acredita datos empresariales reales ni reinicio del volumen.
+
 - [2026-10-13] (codex) Despliegue 38505386798 pasó para ambas tools. QA 38505647432 publicó entrada ERP marcada y salida propia `sin_meta` con HTTP 201; cadena y reinicio aislado verificados. Compare ya registrado `up` en core, track pendiente. Servicios permanecen pausados hasta coordinación; QA no acredita polling/volumen Railway activo.
 
 - [2026-10-13] (codex) Runbook: acepta cantidades ERP numéricas en string y fecha simple; deduplica periodo y actualiza el mismo registro al cambiar el cierre. Entrada inválida queda durable en `rejected` y avanza cursor; configuración inválida/reintento retiene el cursor. Backoff creciente hasta 300 s. Pruebas de reinicio y ACK perdido pasan en Node 22.

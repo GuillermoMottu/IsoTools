@@ -1,5 +1,11 @@
 # Checklist de compare y track
 
+**Actualización más reciente:** ambas URLs ya están registradas en el core. Consumidores
+Railway activados en run 38506459810: `/ready` 200. QA 38506668863 consumida por los
+servicios, registros visibles y salidas HTTP 201. El estado pausado descrito en las
+secciones históricas siguientes queda superado. Evidencia y límites actuales en
+[RESULTADOS_RUNBOOK_COMPARE_TRACK.md](RESULTADOS_RUNBOOK_COMPARE_TRACK.md).
+
 Trabajo publicado en el fork, rama `comm/sync_erp_data_local__compare_planned_vs_actual`.
 Este documento distingue lo probado localmente de la aceptación en Railway.
 El usuario autorizó el 2026-10-13 completar las tareas propias, incluyendo publicar
