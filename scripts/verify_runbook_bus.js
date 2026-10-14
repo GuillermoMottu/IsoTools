@@ -72,7 +72,7 @@ try {
     assert.equal(publications, 1, 'restart uses persisted cursor without publishing again')
     const chain = (await request(`/events/chain/${inputId}`)).payload
     assert.ok(chain.events.some(event => event.event_id === inputId))
-    assert.ok(chain.events.some(event => event.event_id === snapshot.last_publication.event_id && (event.module_id || event.module?.id) === toolId))
+    assert.ok(chain.events.some(event => event.event_id === snapshot.last_publication.event_id && (event.tool || event.module_id || event.module?.id) === toolId))
     report.tests.push({ tool: toolId, input_event_id: inputId, output_event_id: snapshot.last_publication.event_id, output_status: snapshot.last_evaluation.result.status, post_http_status: 201, restart_duplicate: false, chain_verified: true, correlation_id: inputId })
   }
   assert.equal(outputIds.size, selected.length)
