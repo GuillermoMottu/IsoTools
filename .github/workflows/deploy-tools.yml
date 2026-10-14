@@ -194,4 +194,5 @@ jobs:
         env:
           ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
           TOOL_SELECTED: ${{ inputs.tool }}
+          VERIFY_DEPLOYED_CONSUMER: 'true'
         run: node scripts/verify_runbook_bus.js
