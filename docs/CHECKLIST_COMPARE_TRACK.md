@@ -24,10 +24,17 @@ pasó en ambas tools. Los indicadores `central_key_changed: true` y
 de la entregada por el usuario; se sustituyó y el GET central desde Railway pasó
 de 401 a 200. No era necesario generar una nueva clave ni cambiar el registro central.
 
-Estado actual: ambas sirven `d6b6a2b533d316656218198990cbbcc1eb67ad33`, `/health` 200,
+Estado actual: ambas sirven `c8ce1198aad225a024fee3e2a9775322b918a0cd`, `/health` 200,
 SSO abierto, API URL oficial, clave aceptada para lectura y volumen `/data` conservado.
 Los consumidores siguen deshabilitados, `/ready` 503 `consumer_disabled`, cursor null,
 sin publicaciones pendientes ni registros. No se publicaron eventos productivos.
+
+El despliegue [38505386798](https://github.com/GuillermoMottu/IsoTools/actions/runs/38505386798)
+y la prueba QA [38505647432](https://github.com/GuillermoMottu/IsoTools/actions/runs/38505647432)
+pasaron. La prueba publica eventos marcados, verifica POST 201 y cadenas, y reinicia
+un runner aislado: no activa consumidores Railway. Compare ahora está registrado
+en el core con salud `up`; track sigue sin URL central. Detalle del runbook y SSO
+en [RESULTADOS_RUNBOOK_COMPARE_TRACK.md](RESULTADOS_RUNBOOK_COMPARE_TRACK.md).
 
 Además, upstream documenta en `docs/ERP_CENTRAL.md` y la comunicación de cierre que
 la meta no viene del ERP. Se corrigió nuestra divergencia: un cierre válido sin meta
