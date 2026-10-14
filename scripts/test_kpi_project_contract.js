@@ -24,6 +24,8 @@ const project = runTrackProjectProgressTool({ scenario: 'at_risk' }).input
 const production = runComparePlannedVsActualTool({ scenario: 'deviation' }).input
 const variance = compare({ asset: { asset_id: 'LINE-DEMO', plant_id: 'plant_01' }, data: { ...production, ...project } })
 const report = generate(variance)
-assert.equal(report.data.project_id, undefined)
-assert.equal(track(report), null)
-console.log('KPI/project contract smoke OK; compare output does not preserve project fields (confirmed gap)')
+assert.equal(report.data.project_id, project.project_id)
+assert.equal(report.data.planned_start_date, project.planned_start_date)
+assert.equal(report.data.actual_progress_percent, project.actual_progress_percent)
+assert.equal(track(report).data.project_id, project.project_id)
+console.log('KPI/project contract smoke OK; supplied real project context survives Compare -> KPIs -> Track')

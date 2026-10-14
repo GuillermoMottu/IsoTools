@@ -1,6 +1,8 @@
 // src/tools/compare_planned_vs_actual.js
 // Objetivos vs ejecucion (gap analysis y Revision por Direccion). isoEvent: "production_variance_report".
 
+import { projectFields } from '../utils/projectContext.js'
+
 const CALCULATION_VERSION = '1.0.0'
 const RULE_VERSION = '1.0.0'
 
@@ -423,6 +425,10 @@ function buildResult (input, thresholds) {
 }
 
 export function evaluatePlannedVsActual (event) {
+  return { ...evaluateComparison(event), ...projectFields(event.data || {}) }
+}
+
+function evaluateComparison (event) {
   const input = normalizeInput(event.data || {}, event.asset || {})
   const validObject = input.thresholds !== null && typeof input.thresholds === 'object' && !Array.isArray(input.thresholds)
   const thresholds = mergeThresholds(validObject ? input.thresholds : {})

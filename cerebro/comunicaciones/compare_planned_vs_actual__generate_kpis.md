@@ -69,6 +69,7 @@ tags: [comunicacion, PRODUCTION_VARIANCE_DETECTED]
 - [2026-06-28] (auto) nota inicial generada desde communication-rules.json.
 - [2026-07-23] (codex) La condicion cambia de `always` a `status != 'not_calculable'`; el payload queda en `snake_case` y `generate_kpis` puede leer `plant_id`, `period`, `metrics` y evidencia de proyecto si viene en el evento.
 - [2026-10-13] (codex) El consumidor de cierre ERP conserva el caso upstream `sin_meta`: publica ventas reales con meta y desviaciones null. La regla existente permite esta salida; no representa una comparación calculada ni aporta contexto de proyecto a track. Se conservan alias camelCase y evidencia de periodo en `source_period`.
+- [2026-10-13] (codex) Compare ahora conserva el contexto de proyecto recibido, usando el mismo mapeo que generate_kpis. La prueba Compare→KPIs→Track confirma ID, fechas, avance e hitos sin inventar campos cuando no vienen. Falta que el productor entregue ese contexto real.
 
 ## Flujo de trabajo
 1. `npm run rama:comm compare_planned_vs_actual__generate_kpis` (crea/cambia a la rama `comm/compare_planned_vs_actual__generate_kpis`).
