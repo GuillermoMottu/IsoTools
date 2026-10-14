@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict'
-import { runtimePlan, configureCentralKey } from './prepare_railway_tool.js'
+import { runtimePlan, configureCentralKey, consumerActivationReady } from './prepare_railway_tool.js'
 import { deploymentConfigurationReady, stateDirectoryIsPersistent } from './inspect_railway_tool.js'
 import { deploymentIsCurrent } from './wait_tool_deployment.js'
 
 const tool = 'compare_planned_vs_actual'
+const activationConnection = { central_api_key_works: true, health_url: 'https://cpa.orcalabs.mx/health' }
+const registered = { id: tool, kind: 'federated', url: 'https://cpa.orcalabs.mx', healthUrl: activationConnection.health_url, health: { state: 'up' } }
+assert.equal(consumerActivationReady({ tools: [registered] }, tool, activationConnection), true)
+assert.equal(consumerActivationReady({ tools: [] }, tool, activationConnection), false)
+assert.equal(consumerActivationReady({ tools: [{ ...registered, url: null }] }, tool, activationConnection), false)
+assert.equal(consumerActivationReady({ tools: [{ ...registered, kind: 'native' }] }, tool, activationConnection), false)
+assert.equal(consumerActivationReady({ tools: [{ ...registered, health: { state: 'down' } }] }, tool, activationConnection), false)
+assert.equal(consumerActivationReady({ tools: [registered] }, tool, { ...activationConnection, central_api_key_works: false }), false)
 const service = 'compare-planned-vs-actual'
 const calls = []
 const variables = { ISOTOOLS_API_KEY: 'old-fixture-key' }

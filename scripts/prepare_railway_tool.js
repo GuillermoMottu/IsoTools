@@ -4,6 +4,13 @@ import { railwayJson, inspectConnection, inspectConfiguration } from './inspect_
 
 const COOKIES = { compare_planned_vs_actual: 'cpa_session', track_project_progress: 'tpp_session' }
 
+export function consumerActivationReady (registry, toolId, connection) {
+  const entry = registry.tools?.find(tool => tool.id === toolId)
+  return connection.central_api_key_works === true && Boolean(connection.health_url) &&
+    entry?.kind === 'federated' && entry.url === new URL(connection.health_url).origin &&
+    entry.healthUrl === connection.health_url && entry.health?.state === 'up'
+}
+
 export async function configureCentralKey (variables, toolId, service, suppliedKey, cli = railwayJson, fetcher = fetch) {
   if (!suppliedKey) return { supplied: false, changed: false }
   if (variables.ISOTOOLS_API_KEY === null) throw new Error('sealed_central_key_requires_review')
@@ -56,20 +63,28 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const plan = runtimePlan(toolId, service, variables, volumeList)
     stage = 'configure_central_key'
     const keyResult = await configureCentralKey(variables, toolId, service, process.env.ISOTOOLS_API_KEY)
-    if (variables.TOOL_CONSUMER_ENABLED === 'true') {
+    const activate = process.env.ACTIVATE_CONSUMER === 'true'
+    if (variables.TOOL_CONSUMER_ENABLED === 'true' || activate) {
       const connection = await inspectConnection(variables, toolId, process.env.HEALTH_URL)
       if (!connection.central_api_key_works) throw new Error('active_consumer_requires_valid_central_key')
+      if (activate) {
+        stage = 'verify_central_registration'
+        const response = await fetch('https://api-events.orcalabs.mx/api/v1/console/tools', { redirect: 'error', signal: AbortSignal.timeout(15000) })
+        if (!response.ok || !consumerActivationReady(await response.json(), toolId, connection)) throw new Error('consumer_registration_not_ready')
+        plan.assignments = plan.assignments.filter(value => !value.startsWith('TOOL_CONSUMER_ENABLED='))
+        plan.assignments.push('TOOL_CONSUMER_ENABLED=true')
+      }
     }
     stage = 'create_volume'
     // Volume creation in CLI 5.67.1 requires an ID; variable commands accept names.
     if (plan.createVolume) railwayJson(['volume', '--service', plan.volumeServiceId, 'add', '--mount-path', '/data', '--json'])
     stage = 'set_variables'
     railwayJson(['variable', 'set', '--service', service, '--skip-deploys', '--json', ...plan.assignments, `TOOL_BUILD_SHA=${process.env.GITHUB_SHA}`])
-    console.log(JSON.stringify({ tool: toolId, runtime_variables_configured: true, volume_created: plan.createVolume, existing_volume_preserved: !plan.createVolume, active_consumer_preserved: variables.TOOL_CONSUMER_ENABLED === 'true', supplied_central_key_verified: keyResult.supplied, central_key_changed: keyResult.changed }))
+    console.log(JSON.stringify({ tool: toolId, runtime_variables_configured: true, volume_created: plan.createVolume, existing_volume_preserved: !plan.createVolume, active_consumer_preserved: variables.TOOL_CONSUMER_ENABLED === 'true', consumer_activation_requested: activate, supplied_central_key_verified: keyResult.supplied, central_key_changed: keyResult.changed }))
   } catch (error) {
     // CLI stdout/stderr may contain credentials. Report only known local failure codes.
     const safe = ['invalid_runtime_configuration', 'existing_authentication_requires_review', 'existing_volume_requires_review', 'existing_state_directory_requires_review', 'invalid_volume_mount', 'missing_railway_token', 'missing_build_revision', 'missing_volume_service_id', 'sealed_central_key_requires_review', 'supplied_central_key_rejected', 'active_consumer_requires_valid_central_key'].includes(error.message) ? error.message : 'runtime_preparation_failed'
-    console.error(JSON.stringify({ stage, error: safe }))
+    console.error(JSON.stringify({ stage, error: error.message === 'consumer_registration_not_ready' ? error.message : safe }))
     process.exitCode = 1
   }
 }
