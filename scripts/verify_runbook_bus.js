@@ -13,6 +13,7 @@ const dir = await mkdtemp(path.join(os.tmpdir(), 'isotools-qa-bus-'))
 const now = new Date().toISOString()
 const date = now.slice(0, 10)
 const prefix = `qa-runbook-${randomUUID()}`
+const plantId = `QA-PLANT-${prefix}`
 const outputIds = new Set()
 const deployed = process.env.VERIFY_DEPLOYED_CONSUMER === 'true'
 const selected = Object.keys(TOOL_CONTRACTS).filter(toolId => !process.env.TOOL_SELECTED || process.env.TOOL_SELECTED === 'all' || process.env.TOOL_SELECTED === toolId)
@@ -51,9 +52,9 @@ try {
     const cursor = latest.max_seq ?? 0
     const inputId = `${prefix}-${toolId}`
     const data = toolId === 'compare_planned_vs_actual'
-      ? { module: 'sales', period: date, periodStart: date, periodEnd: date, plantId: 'plant_01', actual: '152340.50', unit: 'MXN', documentos: '41', unidades: '380', devuelto: '0', erpType: 'microsip' }
+      ? { module: 'sales', period: date, periodStart: date, periodEnd: date, plantId, actual: '152340.50', unit: 'MXN', documentos: '41', unidades: '380', devuelto: '0', erpType: 'microsip' }
       : { organization_id: 'QA-RUNBOOK', project_id: `QA-PROJECT-${prefix}`, project_name: 'Prueba de integración — sin proyecto real', as_of_date: now, planned_start_date: new Date(Date.now() - 86400000).toISOString(), planned_end_date: new Date(Date.now() + 30 * 86400000).toISOString(), planned_progress_percent: 40, actual_progress_percent: 34, milestones: [], target_type: 'order', target_ids: [`QA-ORDER-${prefix}`] }
-    const input = { event_id: inputId, timestamp: now, platform_version: '2.0', module: { id: 'qa_runbook', version: '1.0.0' }, asset: { asset_id: 'erp-microsip-01', asset_type: 'erp', plant_id: 'plant_01' }, event: { type: contract.consumes, category: toolId === 'compare_planned_vs_actual' ? 'productivity' : 'system', severity: 'low' }, data, correlation_id: inputId, metadata: { test: true } }
+    const input = { event_id: inputId, timestamp: now, platform_version: '2.0', module: { id: 'qa_runbook', version: '1.0.0' }, asset: { asset_id: `qa-erp-${prefix}`, asset_type: 'erp', plant_id: plantId }, event: { type: contract.consumes, category: toolId === 'compare_planned_vs_actual' ? 'productivity' : 'system', severity: 'low' }, data, correlation_id: inputId, metadata: { test: true } }
     if (toolId === 'track_project_progress') Object.assign(data, { projectId: data.project_id, targetType: data.target_type, targetIds: data.target_ids })
     const inserted = await request('/events', input)
     assert.equal(inserted.payload.status, 'accepted')
@@ -100,8 +101,13 @@ try {
     assert.equal(snapshot.last_publication.http_status, 201)
     const chain = (await request(`/events/chain/${inputId}`)).payload
     assert.ok(chain.events.some(event => event.event_id === inputId))
-    assert.ok(chain.events.some(event => event.event_id === snapshot.last_publication.event_id && (event.tool || event.module_id || event.module?.id) === toolId))
-    report.tests.push({ tool: toolId, input_event_id: inputId, output_event_id: snapshot.last_publication.event_id, output_status: snapshot.last_evaluation.result.status, post_http_status: 201, restart_duplicate: deployed ? null : false, deployed_record_verified: deployed, chain_verified: true, correlation_id: inputId })
+    const published = chain.events.find(event => event.event_id === snapshot.last_publication.event_id && (event.tool || event.module_id || event.module?.id) === toolId)
+    assert.ok(published, 'the chain contains this tool publication')
+    assert.equal(published.correlation_id, inputId)
+    assert.equal(published.causation_id, inputId)
+    assert.equal(typeof published.data?.status, 'string')
+    // A later input may replace last_evaluation while this publication stays current.
+    report.tests.push({ tool: toolId, input_event_id: inputId, output_event_id: published.event_id, output_status: published.data.status, post_http_status: 201, restart_duplicate: deployed ? null : false, deployed_record_verified: deployed, chain_verified: true, correlation_id: inputId })
   }
   assert.equal(outputIds.size, selected.length)
   console.log(JSON.stringify(report, null, 2))

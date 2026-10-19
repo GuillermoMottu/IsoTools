@@ -1,121 +1,106 @@
-# Correcciones locales de SSO para compare y track
+# Cierre técnico de compare y track
 
-Fecha: 19 de octubre de 2026.
+Fecha: 19 de octubre de 2026. Última comprobación de estado: 21:57 UTC (15:57 de Ciudad de México).
 
-Avance de aplicación: el usuario pidió trabajar nuestras actividades pendientes. Se configuraron en Actions del fork los cuatro secretos nuevos `COMPARE_SESSION_SECRET`, `TRACK_SESSION_SECRET`, `COMPARE_TOOL_API_KEY` y `TRACK_TOOL_API_KEY`, desde los archivos locales por stdin y sin imprimir sus valores. La preparación ahora incorpora únicamente secretos ausentes en Railway, valida primero el plan completo y conserva secretos de sesión existentes. Si una key de máquina existente no coincide con la de CI, se detiene para evitar reemplazarla. Las regresiones pasaron en Windows y Node 22 Linux. La aplicación en Railway y su validación se registrarán al terminar el despliegue.
+**Nuestras dos tools ya están desplegadas con SSO obligatorio y la QA marcada pasó. El login humano sigue bloqueado por la configuración de callbacks en Logto.** No se considera aceptado todo el runbook mientras ese bloqueo y las pruebas empresariales y operativas pendientes sigan abiertos.
 
-La parte de código de nuestras dos tools está corregida y probada. Las correcciones se publicaron en nuestro fork, rama `comm/sync_erp_data_local__compare_planned_vs_actual`, commit `328519533296861d179fca7c1bff08b1db85a97f`, confirmado por la API de GitHub. Este documento no declara que el SSO esté activo en Railway. No se desplegó, cambiaron variables remotas ni publicaron eventos QA al core durante esta implementación.
+## Cambios aplicados
 
-Actualización de aplicación: tras la autorización explícita del usuario, se ejecutó [la inspección 39329650233](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233) sobre el commit `cc836cd6c2ea4ef2dff1787cc55b1f724d62de16`, con `tool=all`, `mode=inspect` y `activate_consumer=false`. Terminó correctamente el 19 de octubre a las 21:43 UTC (15:43 de Ciudad de México). Los pasos de preparación, escritura de variables, despliegue y publicación QA quedaron omitidos. Que el workflow esté verde acredita la ejecución de la inspección, no la aceptación productiva.
+- Rama del fork: `comm/sync_erp_data_local__compare_planned_vs_actual`.
+- Código servido por ambos servicios: `0f7af25780308e516ebe7a55a65ddcb2b1a07e16`.
+- [Inspección inicial autorizada](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233): encontró Logto y callbacks configuradas, pero SESSION_SECRET y TOOL_API_KEY ausentes.
+- [Despliegue autorizado, finalizado correctamente](https://github.com/GuillermoMottu/IsoTools/actions/runs/39330751889): incorporó únicamente los secretos faltantes y desplegó ambas tools. Las pruebas con Node 22 pasaron antes de escribir variables.
+- Se conservaron los volúmenes existentes, los consumidores habilitados y la key central. No se creó otro volumen, no se rotaron credenciales existentes y no se reprodujo el historial.
+- [QA marcada autorizada, finalizada correctamente](https://github.com/GuillermoMottu/IsoTools/actions/runs/39331063240): publicó dos entradas QA y verificó los registros desplegados, el acuse 201 y sus cadenas exactas.
 
-## Resultado de la inspección autorizada
+## Verificación productiva actual
 
 | Comprobación | Compare | Track |
 | --- | --- | --- |
-| Issuer, ID y secreto de aplicación presentes | Sí | Sí |
-| Callback configurada coincide con la URL propia | Sí | Sí |
-| SESSION_SECRET | Ausente | Ausente |
-| TOOL_API_KEY para QA automatizada | Ausente | Ausente |
-| URL del core y API key válidas; suscripción HTTP 200 | Sí | Sí |
-| Consumidor habilitado y volumen persistente en /data | Sí | Sí |
-| Ruta del estado coincide con el volumen | Sí | Sí |
-| Versión servida | `1e071b02d1c21fa4bef5ea41ad7a2389d1f1e1fb` | `1e071b02d1c21fa4bef5ea41ad7a2389d1f1e1fb` |
-| Autenticación servida | Abierta | Abierta |
-| Rechazo de sesión/API anónima | No | No |
-| Assets públicos revisados con prefijos reales de API key y secreto de aplicación | Sin coincidencias | Sin coincidencias |
+| Health y readiness | 200 | 200 |
+| Identidad y SHA servido | Correctos | Correctos |
+| Autenticación | SSO | SSO |
+| SESSION_SECRET y TOOL_API_KEY | Configurados | Configurados |
+| Sesión y API anónimas | 401 | 401 |
+| API con key incorrecta | 401 | 401 |
+| API con credencial propia de servicio | 200 | 200 |
+| Deep link sin sesión | 302, destino conservado | 302, destino conservado |
+| Inicio OIDC | PKCE S256, state y nonce | PKCE S256, state y nonce |
+| Cookie de handshake | Secure y HttpOnly | Secure y HttpOnly |
+| Volumen existente y ruta persistente | Conservados | Conservados |
+| Registros anteriores tras reemplazar el contenedor | Conservados | Conservados |
+| Cursor antes → después del despliegue, antes de QA nueva | 7440 → 7440 | 7445 → 7445 |
+| Cursor en la comprobación posterior a QA | 7679 | 7684 |
+| Assets contrastados con marcadores y prefijos de secretos | Sin coincidencias | Sin coincidencias |
+| Login humano completo | Bloqueado en Logto | Bloqueado en Logto |
 
-La única variable obligatoria de SSO que el inventario informa ausente es `SESSION_SECRET`. La presencia de credenciales y una callback correcta en Railway no verifica la aplicación, las URIs registradas ni los roles en Logto: eso requiere un login real después de configurar y desplegar. No hay secreto de sesión remoto con el que contrastar los assets. Tampoco hay `TOOL_BUSINESS_CONFIG_FILE`; no se concluye por ello que falte toda configuración empresarial.
+La persistencia se comprobó mediante el reemplazo real de los contenedores durante el despliegue, comparando antes y después los identificadores anteriores y el cursor. Las cadenas antiguas y nuevas conservaban una sola publicación propia por entrada después de más ciclos de polling. No se provocó una caída del core, ERP o túnel, ni se hizo una prueba de pérdida abrupta del volumen.
 
-El siguiente cambio remoto concreto sería cargar un secreto de sesión independiente por tool y desplegar el código corregido. Para la QA automática también se necesita `TOOL_API_KEY` independiente por backend y su copia en `COMPARE_TOOL_API_KEY` / `TRACK_TOOL_API_KEY` de Actions. Los candidatos locales ya existen, pero siguen sin aplicarse. La autorización recibida cubrió únicamente la inspección.
+## QA y corrección del informe
 
-## Cambios implementados
+Prefijo: `qa-runbook-0d49984c-65f4-4275-a222-92a2abe273e3`.
 
-- Configuración de las tools y plantilla: se aceptan `ISSUER_ENDPOINT`, `APP_ID` y `APP_SECRETS` sin duplicar variables. Los nombres `OIDC_ISSUER`, `OIDC_CLIENT_ID` y `OIDC_CLIENT_SECRET` tienen prioridad cuando contienen un valor.
-- Con `NODE_ENV=production` se exige SSO completo, issuer y callback HTTPS y cookies Secure. Sin configuración válida el proceso no arranca abierto. Desarrollo sin configuración de identidad conserva el modo abierto.
-- La preparación de Railway exige configuración SSO completa y la callback exacta de cada tool antes de escribir variables. Conserva secretos existentes, el volumen y el cursor; no activa consumidores pausados salvo la opción explícita ya existente.
-- La aceptación del despliegue exige `auth=sso`, identidad y SHA esperados, y rechazo 401 de consultas anónimas a `/auth/me` y `/api/tool/status`.
-- Las imágenes generan `assets/manifest.json`. Así se pueden revisar los archivos públicos compilados aunque la pantalla HTML requiera login. La pantalla sigue protegida.
-- El inspector busca nombres y prefijos reales de API key, secreto Logto, secreto de sesión y credencial de máquina. Una clave sellada no se presenta como valor comprobado. La comprobación estricta del bundle falla si faltan los valores necesarios para certificar esos prefijos.
-- La QA desplegada admite una credencial de máquina independiente por tool, usando el plano `TOOL_API_KEY` que el backend ya soportaba. Verifica acceso y SSO antes de publicar la entrada QA de esa tool. No manda la key del core a las tools.
-- El workflow incorpora pruebas con Node 22 antes de preparar o desplegar servicios. Los ejemplos de entorno y la plantilla documentan el requisito actualizado.
+| Tool | Evento de salida propio | Resultado real | Cadena |
+| --- | --- | --- | --- |
+| compare_planned_vs_actual | `229406da-7160-45b3-964d-aff51dfe7ea9` | `sin_meta` | 5 eventos |
+| track_project_progress | `ab53486f-5c06-4fc1-980f-f002362f8714` | `at_risk` | 3 eventos |
 
-La política de autenticación del core/dashboard en `src/auth/` no se modificó: corresponde al equipo de plataforma. En una revisión posterior solo se eliminó del mensaje de error el valor de un issuer inválido, para evitar imprimir variables sensibles. Las tools utilizan `src/tool-auth/` y autentican directamente contra Logto.
+Se verificaron event_id, identidad de la tool, correlation_id, causation_id y el resultado exacto de esas salidas, además de los registros autenticados del consumidor. Las cuatro entradas revisadas —las dos antiguas y las dos nuevas— tenían una sola salida propia cada una. No quedaron publicaciones pendientes.
 
-## Credenciales preparadas localmente
+El resumen original del workflow informó `not_calculable` para track porque usaba `last_evaluation`, que ya correspondía a otra entrada posterior. La salida QA exacta y su evaluación por registro son `at_risk`. Se corrigió `verify_runbook_bus.js` para leer el resultado del evento de salida exacto y comprobar su correlación y causación. La regresión reproduce una evaluación posterior ajena y pasó en Windows y Node 22 Linux. Este ajuste afecta al verificador, no cambia los contratos ni requiere volver a desplegar los servidores. No se publicaron entradas adicionales para corregir el informe.
 
-Se generaron candidatos independientes de 32 bytes aleatorios por secreto. Los valores no se imprimieron en las salidas de herramientas y los archivos están excluidos por `.gitignore`.
+El verificador también usa ahora una planta y un asset explícitamente QA e independientes por ejecución. Así una repetición el mismo día no queda bloqueada por la deduplicación correcta de un periodo QA anterior sin cambios. La regresión valida el payload y la clave de periodo de esa planta aislada; este ajuste se comprobó con fixtures, sin publicar más eventos.
 
-| Tool | Archivo local de sesión | Archivo local de credencial de máquina |
+`sin_meta` en compare es el comportamiento esperado sin una meta aprobada; no acredita una comparación empresarial terminada. El proyecto de track es explícitamente de prueba, no una aceptación con un proyecto real.
+
+## Bloqueo concreto de Logto
+
+En ambas navegaciones reales, y de nuevo mediante GET al proveedor, Logto respondió HTTP 400 con `oidc.invalid_redirect_uri`. El rechazo ocurre antes de pedir usuario y contraseña; no se introdujeron credenciales de la cuenta de prueba.
+
+Datos para que plataforma corrija o confirme la aplicación:
+
+| Campo | Valor observado |
+| --- | --- |
+| Proveedor | `https://pfwk8f.logto.app` |
+| Client ID utilizado por ambas tools | `7ms3ixe2j7nb4d98s3w98` |
+| Callback de compare que se debe registrar | `https://cpa.orcalabs.mx/auth/callback` |
+| Callback de track que se debe registrar | `https://tpp.orcalabs.mx/auth/callback` |
+| Scopes enviados con la configuración existente | `openid roles` |
+
+El Client ID es un identificador público, no APP_SECRETS. Plataforma debe confirmar si ambas tools deben usar esa misma aplicación y registrar las dos URLs en su lista de Redirect URIs, o entregar las credenciales de la aplicación correcta para cada servicio. Crear OIDC_REDIRECT_URI en Railway no registra la callback en Logto.
+
+Después de esa corrección: repetir login y retorno al deep link, verificar la cookie de sesión propia, roles efectivos, denegación con usuarios sin permisos y logout real. Confirmar también el alcance de claims y la URI de cierre de sesión; no se certificaron durante esta ejecución.
+
+## Secretos y alcance
+
+Los cuatro secretos nuevos se copiaron desde archivos locales ignorados a Actions y, durante la preparación autorizada, a Railway por stdin. No se imprimieron valores ni prefijos ni se incluyeron secretos en commits.
+
+| Archivo local privado | Secreto de Actions | Variable Railway |
 | --- | --- | --- |
-| compare_planned_vs_actual | `.env.cpa.session.local` | `.env.cpa.service.local` |
-| track_project_progress | `.env.tpp.session.local` | `.env.tpp.service.local` |
+| `.env.cpa.session.local` | COMPARE_SESSION_SECRET | SESSION_SECRET de compare |
+| `.env.tpp.session.local` | TRACK_SESSION_SECRET | SESSION_SECRET de track |
+| `.env.cpa.service.local` | COMPARE_TOOL_API_KEY | TOOL_API_KEY de compare |
+| `.env.tpp.service.local` | TRACK_TOOL_API_KEY | TOOL_API_KEY de track |
 
-Los archivos de sesión contienen `SESSION_SECRET`, nombre de cookie y URIs. Son los secretos de sesión que pidió el líder. Los archivos de servicio contienen `TOOL_API_KEY`, para el acceso automatizado a APIs protegidas de cada tool. No son secretos de aplicación de Logto ni la key del core.
+La preparación rechaza claves de máquina existentes diferentes de la de CI y valida el plan SSO completo antes de escribir secretos. Conserva los secretos de sesión existentes. No se modificaron las credenciales Logto ni la política del core/dashboard. No se envió ningún secreto ni mensaje a otra persona.
 
-Antes de aplicar cualquiera, inspeccionar el servicio. Si ya existe un secreto válido, conservarlo y no sustituirlo por el candidato local. No se enviaron secretos a otra persona ni se configuraron en Railway o GitHub.
+La revisión de código, historial local y exclusiones, con sus límites, está en [REVISION_SECRETOS_2026-10-19.md](REVISION_SECRETOS_2026-10-19.md). La ausencia de coincidencias en assets no equivale a una certificación integral de seguridad.
 
-## Configuración por servicio
+## Pendientes compartidos y de plataforma
 
-| Campo | Compare | Track |
-| --- | --- | --- |
-| Servicio Railway | compare-planned-vs-actual | track-project-progress |
-| TOOL_PAGE_ID | compare_planned_vs_actual | track_project_progress |
-| OIDC_REDIRECT_URI | https://cpa.orcalabs.mx/auth/callback | https://tpp.orcalabs.mx/auth/callback |
-| SESSION_COOKIE_NAME | cpa_session | tpp_session |
-| OIDC_POST_LOGOUT_REDIRECT_URI | https://api-events.orcalabs.mx/ | https://api-events.orcalabs.mx/ |
-| OIDC_SCOPES | openid profile email roles | openid profile email roles |
-| ISOTOOLS_API_URL | https://api-events.orcalabs.mx/api/v1 | https://api-events.orcalabs.mx/api/v1 |
-| Credencial de CI para API propia | COMPARE_TOOL_API_KEY | TRACK_TOOL_API_KEY |
+- Registrar o corregir las callbacks de Logto y confirmar aplicaciones, claims, roles y logout. Después nos corresponde repetir las pruebas humanas.
+- Alinear owner y requiredRoles del catálogo central con la matriz definitiva.
+- Proporcionar una meta aprobada, un cierre ERP real y contexto real de proyecto para la aceptación funcional.
+- Coordinar una interrupción y recuperación real del core/ERP/túnel. El backoff y los reintentos ya pasaron en pruebas aisladas; no se interrumpieron servicios de plataforma.
+- El estado privado Active del último deployment y los logs operativos del servicio no se inspeccionaron directamente. El enlace de deployment abierto en el navegador devolvió 404 con la sesión disponible. La ejecución de despliegue exitosa, health, readiness y SHA sí se verificaron.
 
-`ISSUER_ENDPOINT`, `APP_ID` y `APP_SECRETS` deben corresponder a la aplicación Logto de cada tool. La callback también debe estar registrada en Logto; crear la variable en Railway no registra una URI en el proveedor de identidad.
+No cambiaron contratos de eventos ni se agregaron tools o reglas de comunicación; no corresponde regenerar el cerebro ni modificar sus bitácoras por estos ajustes.
 
-Para ejecutar la QA por Actions con SSO activo, el valor de `TOOL_API_KEY` del backend de compare debe coincidir con el secreto de Actions `COMPARE_TOOL_API_KEY`; para track, con `TRACK_TOOL_API_KEY`. Son opcionales para el uso humano de la tool, pero necesarios para esa inspección automatizada del estado. La clave central continúa en `ISOTOOLS_API_KEY` y conserva sus scopes propios.
+## Evidencia
 
-## Evidencia ejecutada
-
-- 19 de 19 comprobaciones locales pasaron con Node v25.9.0 en Windows: las 17 de la auditoría más `test_sso_configuration.js` y `test_runbook_deployed_auth.js`.
-- 11 de 11 comprobaciones del backend pasaron con Node v22.23.3 en Linux, dentro de un contenedor sin red, con el código actual montado en solo lectura y temporales aislados.
-- Dos compilaciones Vite, una por tool, generaron sus manifiestos correctamente.
-- Los dos builds se sirvieron con el backend actual en contenedores Node 22 con `NODE_ENV=production`, Logto simulado y red deshabilitada. Se comprobó health 200 con SSO, APIs anónimas 401, pantalla 302 y manifiesto público 200, además de la revisión de sus assets.
-- Las pruebas de handshake usan las variables con nombres Logto y verifican PKCE, firma RSA/JWKS, state, nonce, emisor, audiencia, expiración, callback, deep link, logout y denegación a usuarios sin rol o sin permiso de operación.
-- La nueva regresión QA comprueba que las claves del core y de las tools no se cruzan; con credencial ausente o incorrecta no publica ninguna entrada de prueba en ese caso. Con las dos credenciales válidas verifica ambos flujos simulados.
-- YAML del workflow, orden de pruebas antes de cambios remotos, manifiestos y ausencia de marcadores de secretos/prefijos de los candidatos locales en los builds: comprobados.
-- Análisis estático explícito `no-undef` y `no-unused-vars` de los JavaScript cambiados: pasó. El lint general del repositorio no pudo ejecutarse con sus valores predeterminados porque falta una configuración ESLint; no se agregó una configuración global fuera de este alcance.
-- `git diff --check`: pasó.
-
-Evidencia local:
-
-- [Resultados de las 19 comprobaciones](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-fixes/tests.json>).
-- [Resultados Linux Node 22](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-fixes/node22-linux-tests.log>).
-- [Build real y backend de compare en modo producción](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-fixes/production-compare_planned_vs_actual.log>).
-- [Build real y backend de track en modo producción](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-fixes/production-track_project_progress.log>).
-
-Se reutilizó una imagen local para el runtime Linux con las dependencias que ya contenía, montando el código actual. No se descargaron ni reconstruyeron imágenes completas y no se desplegó ese contenedor. Estas pruebas no son una sesión real con Logto ni un reinicio del volumen Railway.
-
-La revisión posterior de secretos encontró y corrigió un archivo local de frontend con una variable privada VITE_, exclusiones insuficientes de `.env` anidados en Docker y el mensaje de issuer inválido. Evidencia y límites en [REVISION_SECRETOS_2026-10-19.md](REVISION_SECRETOS_2026-10-19.md).
-
-## Aplicación remota pendiente
-
-La inspección privada confirmó que ambas tools siguen abiertas y sirven la versión anterior. La auditoría anterior encontró un registro QA por servicio. No se cambió ese estado durante esta implementación. Las comprobaciones de aceptación productiva siguen pendientes hasta aplicar y probar esta versión.
-
-La revisión automática inicialmente requirió autorización explícita para el workflow de inspección. El usuario la concedió y la ejecución finalizó correctamente; esa barrera de inspección ya está resuelta. No se desplegó ni se modificaron variables.
-
-Orden de aplicación:
-
-1. Completado: inspección privada de la rama verificada, con `deploy-tools.yml`, `tool=all`, `mode=inspect`, `activate_consumer=false`.
-2. Completado: comprobación de variables, key central y volumen. Pendiente aplicar los secretos de sesión ausentes y, para QA automatizada, las credenciales propias de las tools. Preservar los secretos existentes; nunca imprimir ni pasar secretos como argumentos de CLI.
-3. Confirmar las dos aplicaciones Logto, callbacks, logout y usuarios/roles con plataforma. Los campos faltantes detienen el despliegue antes de escribir variables.
-4. Los cambios ya están publicados en la rama de trabajo. Falta ejecutar las pruebas/despliegue con SSO configurado, conservando los volúmenes y consumidores activos.
-5. Validar login real, 401 anónimo, deep links, logout y permisos con cuentas de Logto.
-6. Ejecutar una QA marcada nueva y verificar salida y cadena exactas de cada consumidor desplegado.
-7. Coordinar reinicio real del servicio y prueba de fallo/recuperación; verificar persistencia y ausencia de duplicados.
-8. Completar aceptación con cierre ERP real, meta aprobada cuando corresponda y contexto real de proyecto.
-
-## Dependencias del líder y plataforma
-
-- Confirmar las credenciales y URIs de cada aplicación Logto y los roles asignados a las cuentas de prueba.
-- Alinear owner y requiredRoles del registro central con la matriz definitiva; el archivo local ya contiene responsable y roles.
-- Proporcionar o confirmar la meta aprobada y el contexto real de proyecto. No se generan datos empresariales ficticios para cerrar esos puntos.
-- Coordinar las pruebas que interrumpan el servicio o dependan del ERP y túnel de planta.
-
-No cambió ningún contrato de eventos ni se agregaron tools o reglas de comunicación, por lo que no corresponde regenerar el cerebro ni modificar las bitácoras de comunicaciones por este cambio de autenticación y validación.
+- [Informes sanitizados de preparación y despliegue](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-application/deployment-39330751889.json>).
+- [Comprobaciones HTTP reales con SSO](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-application/live-sso-verification.json>).
+- [QA original del workflow](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-application/qa-39331063240.json>).
+- [Persistencia y salidas exactas contrastadas después de QA](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-application/persistence-and-exact-outputs.json>).
+- [Rechazo de callbacks por Logto](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-application/logto-callback-check.json>).
+- [Pruebas locales iniciales](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-fixes/tests.json>) y [Node 22 Linux](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-fixes/node22-linux-tests.log>).

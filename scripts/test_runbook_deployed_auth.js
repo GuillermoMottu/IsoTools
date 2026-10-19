@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { TOOL_CONTRACTS } from '../src/services/toolConsumer.js'
+import { TOOL_CONTRACTS, salesInput } from '../src/services/toolConsumer.js'
+import { validateEventPayload } from '../src/services/validationService.js'
 
 const originalFetch = globalThis.fetch
 const originalEnv = { ...process.env }
@@ -37,9 +38,12 @@ try {
         posts++
         const input = JSON.parse(options.body)
         assert.equal(input.metadata.test, true)
+        assert.equal(validateEventPayload(structuredClone(input)).valid, true)
+        assert.match(input.asset.plant_id, /^QA-PLANT-qa-runbook-/)
         const tool = Object.keys(TOOL_CONTRACTS).find(id => TOOL_CONTRACTS[id].consumes === input.event.type)
-        const output = { event_id: `output-${input.event_id}`, module_id: tool }
-        snapshots.set(tool, { records: { QA: { source: { source_record_ids: [input.event_id] } } }, last_publication: { event_id: output.event_id, correlation_id: input.event_id, http_status: 201 }, last_evaluation: { result: { status: 'fixture' } } })
+        if (tool === 'compare_planned_vs_actual') assert.ok(salesInput(input).analysis_id.includes(input.asset.plant_id), 'each QA run has an independent sales period key')
+        const output = { event_id: `output-${input.event_id}`, module_id: tool, correlation_id: input.event_id, causation_id: input.event_id, data: { status: tool === 'track_project_progress' ? 'at_risk' : 'sin_meta' } }
+        snapshots.set(tool, { records: { QA: { source: { source_record_ids: [input.event_id] } } }, last_publication: { event_id: output.event_id, correlation_id: input.event_id, http_status: 201 }, last_evaluation: { result: { status: 'unrelated_later_evaluation' } } })
         chains.set(input.event_id, [input, output])
         return Response.json({ status: 'accepted' }, { status: 201 })
       }
@@ -51,6 +55,10 @@ try {
     assert.equal(process.exitCode, scenario === 'valid' ? 0 : 1)
     assert.equal(posts, scenario === 'valid' ? 2 : 0, 'no input may be published without access to the deployed consumer')
     assert.ok(!logs.join('\n').includes(coreKey) && !logs.join('\n').includes(toolKey))
+    if (scenario === 'valid') {
+      const report = JSON.parse(logs.find(log => log.startsWith('{\n')))
+      assert.deepEqual(report.tests.map(test => test.output_status), ['sin_meta', 'at_risk'], 'status comes from each exact publication, not a later evaluation')
+    }
     if (scenario !== 'valid') assert.ok(logs.some(log => log.includes('deployed_consumer_credentials_required')))
   }
 } finally {

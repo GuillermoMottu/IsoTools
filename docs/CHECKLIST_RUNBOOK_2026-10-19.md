@@ -1,23 +1,23 @@
 # Verificación del runbook de pruebas de IsoTools
 
-Fecha de revisión: 19 de octubre de 2026. Consulta remota principal: 10:31, America/Mexico_City.
+Fecha de revisión: 19 de octubre de 2026. Auditoría inicial: 10:31; última verificación tras despliegue y QA: 15:57, America/Mexico_City.
 
-Actualización posterior del mismo día: se resolvieron la compatibilidad Logto, el requisito SSO en producción, las comprobaciones de despliegue y la validación QA autenticada. Las correcciones se publicaron en nuestro fork en el commit `3285195`. La [inspección privada autorizada 39329650233](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233), ejecutada sobre `cc836cd` a las 15:43 de Ciudad de México, confirmó credenciales de aplicación presentes, callbacks correctas, key central válida, consumidores habilitados y volumen persistente en ambas tools. Falta `SESSION_SECRET` en ambas y siguen sirviendo el build anterior en modo abierto. No se cambiaron variables ni se desplegó. Resultado actualizado, secretos locales preparados, pruebas y pendientes en [CIERRE_LOCAL_SSO_COMPARE_TRACK.md](CIERRE_LOCAL_SSO_COMPARE_TRACK.md).
+Se aplicaron los secretos faltantes y se [desplegaron ambas tools](https://github.com/GuillermoMottu/IsoTools/actions/runs/39330751889), con autorización explícita, sobre `0f7af25780308e516ebe7a55a65ddcb2b1a07e16`. Ambas sirven ese SHA con SSO y rechazan el acceso anónimo. La [QA marcada nueva](https://github.com/GuillermoMottu/IsoTools/actions/runs/39331063240) pasó. Se conservaron volúmenes, cursores, registros anteriores y key central. Resultado y evidencia en [CIERRE_LOCAL_SSO_COMPARE_TRACK.md](CIERRE_LOCAL_SSO_COMPARE_TRACK.md).
 
-Las tablas y los hallazgos de abajo conservan la auditoría original de las 10:31. Los puntos 2.1 y 2.3 ahora cuentan con comprobación privada satisfactoria; B.0 tiene credenciales presentes pero sigue incompleto por el secreto de sesión. El montaje persistente ya se comprobó, y su supervivencia a un reinicio real sigue pendiente. La revisión posterior de assets comparó los prefijos reales de API key y secreto de aplicación sin coincidencias. Los defectos locales descritos en B.0.2 y en el hallazgo 2 fueron corregidos en `3285195`; esa versión todavía no está desplegada. El estado privado Active del último deploy, el login real, los roles y la aceptación empresarial continúan sin certificar.
+La tabla incorpora las comprobaciones posteriores. **Sigue pendiente el login humano:** Logto rechaza las callbacks de ambas tools con `oidc.invalid_redirect_uri`. También siguen pendientes los roles/logout reales, la aceptación empresarial, la alineación del catálogo y las pruebas coordinadas de interrupción de plataforma.
 
-El proyecto todavía no cumple todos los requisitos del runbook actualizado. Las dos tools responden, sus contratos públicos coinciden y las pruebas locales pasan, pero ambas están abiertas sin autenticación en producción. También faltan aceptación con datos empresariales reales, pruebas operativas y alineación del registro central.
+El proyecto todavía no cumple todos los requisitos del runbook actualizado. La seguridad de acceso y la cadena QA de nuestras dos tools están verificadas en producción; el rechazo del proveedor de identidad impide completar una sesión humana y sus pruebas de permisos.
 
 ## Alcance y fuentes
 
 - Documento de referencia: `D:/Descargas/Runbook_Pruebas_Tools_IsoTools (1).docx`, edición de octubre de 2026, incluyendo el bloque B.0 de Logto.
 - Tools verificadas: `compare_planned_vs_actual` y `track_project_progress`. No se certifican las otras tools del catálogo.
 - Rama local: `comm/sync_erp_data_local__compare_planned_vs_actual`.
-- Commit local y de esa rama remota: `abc543d3b8b7f2dded8deba7579481e3bb42d3d1`.
-- Commit informado por ambas tools desplegadas: `1e071b02d1c21fa4bef5ea41ad7a2389d1f1e1fb`.
+- Commit de la auditoría inicial: `abc543d3b8b7f2dded8deba7579481e3bb42d3d1`.
+- Commit servido por ambas tools después del despliegue: `0f7af25780308e516ebe7a55a65ddcb2b1a07e16`.
 - Se revisaron código, configuración versionada, pruebas existentes, respuestas HTTP actuales, bundles y pantallas publicadas. La versión local y la desplegada se evalúan por separado.
 - Las peticiones remotas de la auditoría fueron GET sin credenciales. Abrir las interfaces también ejecutó su evaluación habitual mediante su backend; esa ruta no publica ni modifica la fuente.
-- No se publicaron entradas QA nuevas, no se cambiaron variables, no se reiniciaron servicios, no se provocaron fallos en producción y no se hizo commit ni push. El único archivo añadido al repositorio por esta revisión es este informe; se conservaron los archivos no versionados que ya existían.
+- Después de la auditoría inicial, el usuario autorizó aplicar secretos, desplegar y publicar dos entradas QA marcadas. Se realizó ese trabajo en nuestro fork y en los dos servicios propios, sin modificar el core ni upstream. Los archivos privados siguen ignorados y se conservaron los archivos no versionados preexistentes.
 
 ## Evidencia disponible
 
@@ -25,73 +25,73 @@ El proyecto todavía no cumple todos los requisitos del runbook actualizado. Las
 - [Consultas remotas y revisión de bundles](</C:/Users/Guillermo Mottú/.codex/visualizations/2026/10/19/01a154cf-9a68-78f0-af01-96cd716fe5ed/runbook-audit/remote-and-bundles.json>).
 - [Antecedentes del runbook anterior](RESULTADOS_RUNBOOK_COMPARE_TRACK.md), usados como referencia histórica, no como sustituto de las comprobaciones actuales.
 
-Estados: **Cumple** significa que hay evidencia actual para el alcance indicado; **Local** acredita pruebas aisladas, sin aceptación productiva; **Parcial** conserva requisitos sin comprobar; **No cumple** indica una contradicción observada; **Pendiente** indica una comprobación no realizada.
+Estados: **Cumple** significa que hay evidencia para el alcance indicado; **Local** acredita pruebas aisladas, sin aceptación productiva; **Parcial** conserva requisitos sin comprobar; **No cumple** indica una contradicción observada; **Bloqueado por plataforma** identifica una dependencia externa comprobada; **Pendiente** indica una comprobación no realizada.
 
 ## Checklist aplicado
 
 | Punto del runbook | Estado | Evidencia y trabajo restante |
 | --- | --- | --- |
-| 1.1 Último despliegue Active en Railway | Pendiente | Las URLs responden, pero no se accedió al estado privado del último deploy. HTTP 200 no demuestra el estado del panel. |
+| 1.1 Último despliegue Active en Railway | Parcial | El workflow de despliegue terminó correctamente y ambos servicios sirven el SHA nuevo con health y readiness 200. No se consultó directamente el estado privado Active del panel. |
 | 1.2 Health público, HTTP 200 y JSON | Cumple | Core, cpa y tpp responden 200 JSON sin credenciales. Las tools informan su identidad y build. |
 | 1.3 Readiness HTTP 200 | Cumple | Core y ambas tools responden 200; los consumidores informan `ready`. |
 | A ERP Readiness independiente de que lleguen datos | Local | `test_runbook_consumer.js` comprueba suscripción vacía sin fallo de disponibilidad. No se interrumpió el ERP real. |
-| 2.1 Variables ISOTOOLS_API_URL e ISOTOOLS_API_KEY | Parcial | El código usa los nombres requeridos y el consumidor está listo. Falta inspeccionar los valores/configuración privados de Railway. |
+| 2.1 Variables ISOTOOLS_API_URL e ISOTOOLS_API_KEY | Cumple | Inspección privada confirma URL canónica y key configurada y válida en ambas tools. Se conservaron durante el despliegue. |
 | 2.2 URL del core devuelve API y no HTML | Cumple | `https://api-events.orcalabs.mx/api/v1/health` devuelve JSON con `service=isotools`. |
-| 2.3 Suscripción con key y scopes correctos | Parcial | `ready` es evidencia de polling satisfactorio según el código. Las suscripciones anónimas rechazan con 401. No se ejecutó una consulta directa actual con la key desplegada. |
+| 2.3 Suscripción con key y scopes correctos | Cumple | GET autenticado con la key desplegada devolvió 200 y el contrato de suscripción esperado para ambas tools. |
 | A ERP Evento ERP declarado en consumes | Cumple | El catálogo central de compare declara `ERP_SALES_PERIOD_CLOSED`; coincide con consumidor y catálogo locales. Track consume `KPI_REPORT_GENERATED`. |
 | A ERP Sin credenciales de ERP o Cloudflare en la tool | Parcial | El flujo implementado usa el core. Sin inspección privada no se confirma ausencia de variables sobrantes en Railway. |
 | 3.1 Registro federado completo y alineado | No cumple | URLs, salud y tipo federado correctos. En producción el owner de ambas sigue siendo `pendiente de asignar` y requiredRoles contiene solo `operations.manager`; localmente hay owner y también `platform.auditor`. |
 | 3.2 Aparición en dashboard y salud verde | Cumple | Ambas aparecen `en linea` en la barra lateral y en el resumen del dashboard publicado. |
-| B.0 Credenciales de Logto entregadas en Railway | Pendiente | La afirmación del documento no se tomó como prueba de su presencia actual. Falta inspección privada. |
-| B.0.1 Callback, logout, secreto y cookie propios | Parcial | Docker define `cpa_session` y `tpp_session`; las pruebas verifican cookies seguras. Faltan configuración y registro de URIs reales en Logto. |
-| B.0.2 Conectar nombres Logto con configuración OIDC | No cumple | `src/tool-auth/oidc-config.js` solo lee OIDC_ISSUER, OIDC_CLIENT_ID y OIDC_CLIENT_SECRET. Un ensayo con únicamente ISSUER_ENDPOINT, APP_ID y APP_SECRETS devuelve configuración desactivada. |
+| B.0 Credenciales de Logto entregadas en Railway | Cumple en configuración | Issuer, client ID y secreto de aplicación presentes. SESSION_SECRET independiente aplicado en cada tool. El proveedor todavía rechaza las callbacks. |
+| B.0.1 Callback, logout, secreto y cookie propios | Parcial | Callbacks exactas en Railway y secretos propios configurados. Handshake Secure/HttpOnly observado. Logto devuelve HTTP 400 invalid_redirect_uri; faltan registro de URIs, sesión humana y logout real. |
+| B.0.2 Conectar nombres Logto con configuración OIDC | Cumple | Alias Logto implementados y probados con la librería real. Ambas tools desplegadas informan auth=sso; producción rechaza configuración incompleta. |
 | B.0.3 Solicitar roles y traducirlos | Local | Scope predeterminado `openid profile email roles`; los tests de ambas tools comprueban roles y denegación por rol insuficiente con IdP simulado. Falta Logto real. |
-| B.0.4 Secretos exclusivamente en backend | Parcial | No aparecen los marcadores buscados en los dos builds ni en los bundles desplegados. Falta contrastar los prefijos reales de APP_SECRETS y de la API key, y revisar las variables privadas. |
-| B.0.5 Login real, retorno y auth/me con roles | No cumple | Ambas `/auth/me` responden 200 con `mode=open`, `authenticated=false`; no hay login obligatorio. Las pantallas muestran el aviso de modo abierto. |
+| B.0.4 Secretos exclusivamente en backend | Cumple en revisión dirigida | Revisión privada y assets de ambas versiones nuevas sin marcadores ni prefijos reales de key central, secreto de aplicación y secreto de sesión. Ver alcance y límites de la revisión de secretos. |
+| B.0.5 Login real, retorno y auth/me con roles | Bloqueado por plataforma | auth/me anónimo devuelve 401 mode=sso. Logto rechaza ambas callbacks con oidc.invalid_redirect_uri antes de pedir credenciales. |
 | B ERP Polling independiente de sesión humana | Local | Consumidor usa `x-api-key`, separado del middleware humano; los tests no dependen de una sesión de navegador. |
 | 4.1 y 4.2 Interfaz y API por mismo origen | Cumple | Las interfaces publicadas cargan y muestran registros. El cliente usa rutas relativas `/api/...` y `/auth/me`; las respuestas muestreadas no incluyen Access-Control-Allow-Origin. No se generó una captura HAR completa. |
 | B ERP Interfaz sin llamadas directas a ERP o core | Cumple | El cliente de datos usa el backend propio; el acceso del consumidor al core está en backend. El enlace de navegación al dashboard no es una llamada de datos al ERP. |
 | 5.1 Compilar interfaz | Cumple | Dos builds Vite exitosos, uno por tool, en directorios de evidencia separados. No se sobrescribió el dist del proyecto. |
-| 5.2 Buscar nombres de secretos y prefijos reales | Parcial | Sin coincidencias de ISOTOOLS_API_KEY, TOOL_API_KEY, APP_SECRETS, SESSION_SECRET, CF_ACCESS, erp-planta1 y MICROSIP en los bundles JS examinados. No se dispuso de los valores privados para comparar prefijos reales. |
-| 6.1 API sin cookie responde 401 JSON | No cumple | `/api/analyses`, `/api/records` y `/api/tool/status` responden 200 sin cookie ni key. En local sí se demuestra el 401 cuando SSO está configurado. |
-| 6.2 Deep link sin sesión redirige y conserva destino | No cumple | `/deep/check` devuelve HTML 200 en ambas tools sin redirección. El comportamiento protegido pasa en pruebas locales con SSO. |
+| 5.2 Buscar nombres de secretos y prefijos reales | Cumple en assets revisados | Inspector de cada despliegue contrastó los marcadores y prefijos reales disponibles; sin coincidencias. La revisión de key, client secret y session secret figura como ejecutada. |
+| 6.1 API sin cookie responde 401 JSON | Cumple | Estado, analyses/records y auth/me rechazan acceso anónimo con 401. Una key incorrecta también devuelve 401; la key propia válida permite acceso de servicio. |
+| 6.2 Deep link sin sesión redirige y conserva destino | Parcial | Ambas responden 302 hacia auth/login conservando /deep/check?qa=1. Inicio OIDC con PKCE S256, state y nonce. El retorno completo depende de corregir Logto. |
 | 6.3 Usuario sin roles no puede modificar o aprobar | Local | Pruebas de roles vacíos, desconocidos y auditor sin permiso de operación pasan. Falta prueba con usuarios reales de Logto. |
 | 7.1 Consultar catálogo central | Cumple | Ambos endpoints públicos de catálogo devuelven 200 y la identidad correcta. |
 | 7.2 Consumes y produces coinciden con código | Cumple | Compare: ERP_SALES_PERIOD_CLOSED → PRODUCTION_VARIANCE_DETECTED. Track: KPI_REPORT_GENERATED → PROJECT_AT_RISK. Coinciden catálogo remoto, contratos locales y pruebas. |
 | C ERP Campos del conector y conversión numérica | Local | Tests pasan con importes como texto, fechas, periodo, planta y valores inválidos. La ruta `src/data/connectors/*.json` citada por el documento no existe en este checkout; falta validar el contrato del conector desplegado y una muestra real. |
-| 8.1 Entrada recibida y procesada por servicio desplegado | Parcial | Cada servicio conserva un registro QA y su salida exacta existe en el core. Esta auditoría releyó esa evidencia; no publicó una entrada nueva. |
+| 8.1 Entrada recibida y procesada por servicio desplegado | Cumple en QA | Nueva entrada marcada por tool, registro autenticado y salida exacta comprobados por workflow. Compare sin_meta; track at_risk. |
 | 8.2 Logs poll → procesamiento | Parcial | La secuencia está cubierta localmente y los estados remotos muestran cursores y publicaciones. No se revisaron logs operativos actuales de Railway. |
-| 8.3 Otro ciclo sin duplicar efectos | Local | Pasan deduplicación por event_id, repetición de periodo y retención de UUID durante reintentos. La lectura remota de registros es una instantánea, no una nueva prueba de estímulo. |
-| 8 Cursor next_seq y persistencia | Local | Pruebas pasan con persistencia y recreación del consumidor; cursores remotos compare=7440 y track=7445. Falta verificar montaje y reinicio del volumen Railway. |
+| 8.3 Otro ciclo sin duplicar efectos | Cumple en muestra QA | Tras nuevos ciclos, las entradas antiguas y nuevas de cada tool conservan una sola salida propia y no hay publicación pendiente. No se inyectó un duplicado deliberado en producción. |
+| 8 Cursor next_seq y persistencia | Cumple en despliegue real | Volúmenes conservados; registros anteriores y cursores 7440/7445 sobrevivieron al reemplazo real de contenedores. Tras QA y nuevos ciclos: 7679/7684. No acredita pérdida abrupta de disco. |
 | C ERP Mismo periodo actualiza sin duplicar | Local | El test cubre repetición sin cambios, corrección del importe y event_id repetido. La clave implementada incluye planta, periodo y separación QA. |
-| 9.1 Publicación con 201 y reintento duplicate | Parcial | Los últimos acuses remotos conservados indican HTTP 201 accepted. Las pruebas locales cubren reintentos y UUID estable. No hubo nueva publicación al core durante esta revisión. |
+| 9.1 Publicación con 201 y reintento duplicate | Parcial | Las dos entradas nuevas produjeron salidas propias con HTTP 201. El caso duplicate y UUID estable pasan localmente; no se forzó ese acuse en el core real. |
 | 9.2 Salida visible con module_id propio | Cumple en QA | Las dos salidas exactas se recuperaron del core dentro de sus cadenas QA. No se usó la mera presencia de cualquier evento de la cadena como prueba. |
 | 9 Identidad, correlación y causación correctas | Cumple en QA | Se verificaron event_id propio, module_id de cada tool, correlation_id de entrada y causation_id correcto de ambas salidas almacenadas. |
-| 10.1 y 10.2 Cadena completa consultable | Cumple en QA | Compare tiene cadena QA de 5 eventos; track, de 3. Entrada y salida propias enlazadas y sucesores presentes. Se consultó la API de consola; el endpoint máquina con API key queda sin prueba directa actual. |
+| 10.1 y 10.2 Cadena completa consultable | Cumple en QA | Cadena nueva de compare con 5 eventos y de track con 3, comprobadas por API de máquina en Actions y relectura de consola. Causación y correlación de las salidas exactas coinciden. |
 | C ERP Cadena productiva desde erp_connector | Pendiente | Las entradas verificadas tienen origen qa_runbook. No acreditan lectura empresarial del ERP ni contexto real de proyectos. |
 | 11.1 Evento malformado no cae ni bloquea cursor | Local | Pasan cuarentena, rechazo, avance de cursor y ausencia de publicación para entrada no calculable. API local inválida devuelve 400. No se inyectó basura en producción. |
 | 11.2 Core no disponible, backoff y recuperación | Local | Se prueban fallos simulados y esperas 10, 20, 40, 80, 160 y 300 segundos; persistencia del envío pendiente. Falta prueba operativa controlada de interrupción y recuperación. |
 | C ERP Sin NaN y último dato con fecha | Parcial | Conversión y rechazo de valores inválidos pasan; la UI publicada muestra fuente y fecha. No se apagó planta ni túnel para ensayar el comportamiento operacional. |
 | 12.1 Consistencia visual | Cumple en revisión básica | Se observaron compare, track y dashboard publicados: tema oscuro, tipografía y cabecera consistentes. No constituye auditoría visual exhaustiva de todos los tamaños. |
-| 12.2 Aviso de modo abierto | No válido para aceptar producción | El aviso existe y describe correctamente la situación actual. El propio B.0 exige login obligatorio; mostrar el aviso no resuelve ese incumplimiento. |
+| 12.2 Aviso de modo abierto | No aplica en producción actual | Ambas tools sirven SSO y exigen autenticación. No se acepta volver a modo abierto para evitar el rechazo de Logto. |
 | C ERP Fuente, frescura y marca QA visibles | Cumple | Ambas pantallas muestran `Datos de prueba`, fuente y fecha. Compare muestra `Sin meta`; track identifica explícitamente un proyecto QA sin proyecto real. |
-| Aceptación funcional con datos empresariales reales | Pendiente | Cada tool tiene 1 registro QA y 0 registros no QA almacenados. Esto no prueba ausencia de eventos en todo el core; acredita ausencia de registros empresariales en el estado observado de estas tools. |
+| Aceptación funcional con datos empresariales reales | Pendiente | Las cadenas que se validaron son QA. Compare sigue sin meta aprobada y el proyecto validado de track es de prueba. No acreditan un cierre ERP o proyecto empresarial real. |
 
-## Hallazgos que impiden cerrar el checklist
+## Hallazgos iniciales y estado actual
 
-### 1 Autenticación desactivada en producción
+### 1 Login humano bloqueado por Logto
 
-**Problema observado:** las dos tools informan `auth=open`; datos y estado del consumidor se leen sin sesión. Los deep links tampoco solicitan login. El dashboard central también muestra `SSO desactivado · modo desarrollo`.
+**Estado actual:** el acceso abierto de las tools quedó corregido y desplegado. Ambas exigen SSO y rechazan APIs anónimas con 401. El proveedor Logto devuelve HTTP 400 `oidc.invalid_redirect_uri` para las callbacks correctas de cpa y tpp. Esto impide completar el login antes de introducir las credenciales.
 
-**Acción mínima:** conectar la configuración real de Logto, comprobar callbacks, cookies y roles, y repetir los puntos B.0 y 6 en los servicios desplegados. Las credenciales de Logto no deben reemplazar la API key del consumidor.
+**Acción restante:** plataforma debe registrar las dos callbacks en la aplicación correcta. Después nos corresponde probar sesión humana, roles, retorno y logout. Detalle exacto de la aplicación y URLs en el documento de cierre. No se cambió la autenticación del dashboard central.
 
 **Código relacionado:** `src/tool-auth/oidc-config.js:25`, `src/tool-auth/index.js:28` y `src/tool-server.js:28`.
 
-### 2 Configuración y comprobaciones de despliegue todavía exigen modo abierto
+### 2 Requisito SSO de despliegue corregido
 
-**Problema observado:** `runtimePlan` rechaza autenticación configurada; `deploymentConfigurationReady`, la comprobación posterior y `deploymentIsCurrent` requieren modo abierto. Un ensayo directo con un health válido pero `auth=sso` fue rechazado por `deploymentIsCurrent`.
+**Estado actual:** la preparación valida SSO antes de escribir variables; los criterios de aceptación exigen SSO y SHA exacto. El despliegue autorizado pasó estas comprobaciones en ambas tools. Se cargaron solo SESSION_SECRET y TOOL_API_KEY ausentes, conservando volúmenes, consumidores y key central.
 
-**Acción mínima:** adaptar esos criterios al requisito de autenticación del nuevo runbook y actualizar sus pruebas. No basta con configurar Logto si el proceso de despliegue sigue aceptando únicamente open.
+**Comprobación:** regresiones locales y con Node 22 Linux; pruebas previas y verificaciones posteriores del workflow exitosas. El inspector contrastó los assets reales con los secretos disponibles sin coincidencias.
 
 **Código relacionado:** `scripts/prepare_railway_tool.js:28`, `scripts/inspect_railway_tool.js:102`, `scripts/inspect_railway_tool.js:133` y `scripts/wait_tool_deployment.js:5`.
 
@@ -105,9 +105,9 @@ Estados: **Cumple** significa que hay evidencia actual para el alcance indicado;
 
 ### 4 Falta aceptación operacional y empresarial
 
-**Problema observado:** solo hay registros QA; compare no tiene meta aprobada en el registro observado y track muestra un proyecto de prueba. El reinicio de un consumidor local no prueba recuperación del volumen desplegado.
+**Estado actual:** se ejecutó una QA nueva por tool y se verificaron las cadenas exactas. El reemplazo real de contenedores conservó registros y cursores; no se observaron duplicados en las entradas antiguas y nuevas. Compare sigue sin meta aprobada y track usa un proyecto QA.
 
-**Acción mínima:** verificar volumen, realizar reinicio controlado, repetir idempotencia con estímulo nuevo, comprobar recuperación ante fallo y completar el flujo con un cierre ERP real y contexto de proyecto suficiente. No inventar metas ni proyectos para hacer pasar la prueba.
+**Acción restante:** coordinar interrupción y recuperación reales con plataforma y completar el flujo con cierre ERP, meta aprobada y contexto de proyecto reales. El caso de pérdida abrupta de almacenamiento no se ensayó. No inventar metas ni proyectos para hacer pasar la aceptación.
 
 ## Pruebas ejecutadas
 

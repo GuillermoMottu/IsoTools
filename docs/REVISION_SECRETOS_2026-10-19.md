@@ -2,11 +2,11 @@
 
 Fecha: 19 de octubre de 2026.
 
-La revisión se completó localmente antes de publicar. Posteriormente, las correcciones se publicaron en el fork `https://github.com/GuillermoMottu/IsoTools`, rama `comm/sync_erp_data_local__compare_planned_vs_actual`, commit `3285195`. El remoto upstream `https://github.com/carcamfer/IsoTools` se mantiene como referencia. No se desplegó ni cambiaron credenciales remotas y los archivos privados quedaron excluidos de la publicación.
+La revisión inicial se completó antes de publicar las correcciones en el fork `https://github.com/GuillermoMottu/IsoTools`, rama `comm/sync_erp_data_local__compare_planned_vs_actual`. Después, con autorización explícita, se aplicaron los cuatro secretos nuevos a Actions y a los dos servicios Railway y se desplegó `0f7af25780308e516ebe7a55a65ddcb2b1a07e16`. Se conservaron la key central y las credenciales Logto existentes. El remoto upstream `https://github.com/carcamfer/IsoTools` no se modificó y los archivos privados quedaron excluidos de la publicación.
 
 ## Resultado
 
-Actualización remota: la [inspección autorizada 39329650233](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233), del 19 de octubre a las 21:43 UTC, revisó los assets públicos de ambas tools contra marcadores y prefijos reales de su API key central y secreto de aplicación. No encontró coincidencias. Los valores se mantuvieron en memoria del runner y los informes contienen únicamente estados. `SESSION_SECRET` y `TOOL_API_KEY` están ausentes en ambos servicios; no se acredita una comparación con secretos inexistentes. Ambas tools siguen abiertas en producción, un pendiente de control de acceso independiente de estos resultados sobre assets. No se cambiaron secretos remotos.
+Actualización remota: la [inspección inicial autorizada](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233) no encontró coincidencias en los assets con marcadores ni prefijos reales de key central y secreto de aplicación; los secretos de sesión y máquina aún no existían. Tras configurarlos y [desplegar ambas tools](https://github.com/GuillermoMottu/IsoTools/actions/runs/39330751889), las verificaciones estrictas volvieron a pasar, incluyendo los prefijos reales de los secretos de sesión. Los valores permanecieron en memoria del runner; los informes contienen estados y nombres de variables. Ambas tools ahora responden 401 a sesión/API anónimas y a una key incorrecta. La QA con credenciales propias pasó. El login humano está bloqueado por `invalid_redirect_uri` en Logto y sigue sin certificar.
 
 No se detectaron credenciales reales incrustadas en los archivos publicables mediante los patrones revisados, ni copias de los cinco valores privados locales comparados en esos archivos o en los objetos Git examinados. Las coincidencias heurísticas se contrastaron con el código: correspondían a nombres de campos, referencias a variables de entorno, placeholders, credenciales de pruebas o contraseñas de desarrollo documentadas.
 
@@ -44,7 +44,7 @@ Sí se encontró una key preexistente en `demo-frontend/.env.local`, bajo `VITE_
 - Revisión de los pasos de preparación/inspección de Railway: los informes contienen estados y la clave se transmite a la CLI por stdin, no como argumento. La key central se usa contra el core y la credencial de cada tool contra su backend.
 - Revisión de los bundles locales disponibles y lectura de los dos bundles públicos identificados anteriormente. La key se comparó en memoria, sin enviarla en headers o URLs.
 
-Los cuatro candidatos de sesión y de máquina continúan en archivos locales `.env.*.local`, ignorados por Git. La key anterior quedó preservada en el archivo privado de backend. No se incorporó a los cambios la contraseña de la cuenta de prueba compartida por el líder.
+Los cuatro secretos de sesión y de máquina conservan su copia local en `.env.*.local`, ignorados por Git y Docker. Se aplicaron por stdin a Actions y Railway, sin pasarlos como argumentos ni imprimir valores. La key antigua del frontend quedó preservada en el archivo privado de backend; una consulta posterior al core con ella fue rechazada con 401 y no se la usó para sustituir la key desplegada válida. No se incorporó a los cambios la contraseña de la cuenta de prueba compartida por el líder.
 
 Los ejemplos de Postgres y Docker Compose contienen contraseñas públicas de desarrollo. No son una credencial productiva confirmada y no deben reutilizarse en producción. Este escaneo no verificó qué contraseña utiliza la base desplegada.
 
