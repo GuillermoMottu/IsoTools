@@ -91,6 +91,8 @@ jobs:
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         env:
           ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
+          SESSION_SECRET: ${{ secrets.COMPARE_SESSION_SECRET }}
+          TOOL_API_KEY: ${{ secrets.COMPARE_TOOL_API_KEY }}
           ACTIVATE_CONSUMER: ${{ inputs.activate_consumer == true }}
         run: node scripts/prepare_railway_tool.js
 
@@ -176,6 +178,8 @@ jobs:
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         env:
           ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
+          SESSION_SECRET: ${{ secrets.TRACK_SESSION_SECRET }}
+          TOOL_API_KEY: ${{ secrets.TRACK_TOOL_API_KEY }}
           ACTIVATE_CONSUMER: ${{ inputs.activate_consumer == true }}
         run: node scripts/prepare_railway_tool.js
 

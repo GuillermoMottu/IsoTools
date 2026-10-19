@@ -4,6 +4,30 @@ import { railwayJson, inspectConnection, inspectConfiguration } from './inspect_
 
 const COOKIES = { compare_planned_vs_actual: 'cpa_session', track_project_progress: 'tpp_session' }
 
+export function missingRuntimeSecrets (variables, supplied) {
+  const missing = {}
+  for (const name of ['SESSION_SECRET', 'TOOL_API_KEY']) {
+    const value = supplied[name]?.trim()
+    const existing = variables[name] === null || Boolean(variables[name]?.trim())
+    if (existing) {
+      if (name === 'TOOL_API_KEY' && value && variables[name]?.trim() !== value) throw new Error('existing_tool_key_requires_review')
+      continue
+    }
+    if (!value) continue
+    if (value.length < 32 || /[\r\n\0]/.test(value)) throw new Error('invalid_supplied_runtime_secret')
+    missing[name] = value
+  }
+  return missing
+}
+
+export function configureRuntimeSecrets (variables, service, missing, cli = railwayJson) {
+  for (const [name, value] of Object.entries(missing)) {
+    cli(['variable', 'set', '--service', service, '--skip-deploys', '--json', name, '--stdin'], value)
+    variables[name] = value
+  }
+  return Object.keys(missing)
+}
+
 export function consumerActivationReady (registry, toolId, connection) {
   const entry = registry.tools?.find(tool => tool.id === toolId)
   return connection.central_api_key_works === true && Boolean(connection.health_url) &&
@@ -61,7 +85,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const variables = railwayJson(['variable', 'list', '--service', service, '--json'])
     stage = 'read_volumes'
     const volumeList = railwayJson(['volume', '--service', service, 'list', '--json'])
-    const plan = runtimePlan(toolId, service, variables, volumeList)
+    const missing = missingRuntimeSecrets(variables, process.env)
+    // Validate the complete configuration before writing any supplied secret.
+    const plan = runtimePlan(toolId, service, { ...variables, ...missing }, volumeList)
     stage = 'configure_central_key'
     const keyResult = await configureCentralKey(variables, toolId, service, process.env.ISOTOOLS_API_KEY)
     const activate = process.env.ACTIVATE_CONSUMER === 'true'
@@ -76,15 +102,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         plan.assignments.push('TOOL_CONSUMER_ENABLED=true')
       }
     }
+    stage = 'configure_runtime_secrets'
+    const configuredSecrets = configureRuntimeSecrets(variables, service, missing)
     stage = 'create_volume'
     // Volume creation in CLI 5.67.1 requires an ID; variable commands accept names.
     if (plan.createVolume) railwayJson(['volume', '--service', plan.volumeServiceId, 'add', '--mount-path', '/data', '--json'])
     stage = 'set_variables'
     railwayJson(['variable', 'set', '--service', service, '--skip-deploys', '--json', ...plan.assignments, `TOOL_BUILD_SHA=${process.env.GITHUB_SHA}`])
-    console.log(JSON.stringify({ tool: toolId, runtime_variables_configured: true, volume_created: plan.createVolume, existing_volume_preserved: !plan.createVolume, active_consumer_preserved: variables.TOOL_CONSUMER_ENABLED === 'true', consumer_activation_requested: activate, supplied_central_key_verified: keyResult.supplied, central_key_changed: keyResult.changed }))
+    console.log(JSON.stringify({ tool: toolId, runtime_variables_configured: true, configured_secret_names: configuredSecrets, volume_created: plan.createVolume, existing_volume_preserved: !plan.createVolume, active_consumer_preserved: variables.TOOL_CONSUMER_ENABLED === 'true', consumer_activation_requested: activate, supplied_central_key_verified: keyResult.supplied, central_key_changed: keyResult.changed }))
   } catch (error) {
     // CLI stdout/stderr may contain credentials. Report only known local failure codes.
-    const safe = ['invalid_runtime_configuration', 'sso_configuration_incomplete', 'existing_volume_requires_review', 'existing_state_directory_requires_review', 'invalid_volume_mount', 'missing_railway_token', 'missing_build_revision', 'missing_volume_service_id', 'sealed_central_key_requires_review', 'supplied_central_key_rejected', 'active_consumer_requires_valid_central_key'].includes(error.message) ? error.message : 'runtime_preparation_failed'
+    const safe = ['invalid_runtime_configuration', 'sso_configuration_incomplete', 'existing_volume_requires_review', 'existing_state_directory_requires_review', 'invalid_volume_mount', 'missing_railway_token', 'missing_build_revision', 'missing_volume_service_id', 'sealed_central_key_requires_review', 'supplied_central_key_rejected', 'active_consumer_requires_valid_central_key', 'existing_tool_key_requires_review', 'invalid_supplied_runtime_secret'].includes(error.message) ? error.message : 'runtime_preparation_failed'
     console.error(JSON.stringify({ stage, error: error.message === 'consumer_registration_not_ready' ? error.message : safe }))
     process.exitCode = 1
   }

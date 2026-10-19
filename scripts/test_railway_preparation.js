@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { runtimePlan, configureCentralKey, consumerActivationReady } from './prepare_railway_tool.js'
+import { runtimePlan, configureCentralKey, consumerActivationReady, missingRuntimeSecrets, configureRuntimeSecrets } from './prepare_railway_tool.js'
 import { deploymentConfigurationReady, stateDirectoryIsPersistent } from './inspect_railway_tool.js'
 import { deploymentIsCurrent } from './wait_tool_deployment.js'
 
@@ -16,6 +16,25 @@ const service = 'compare-planned-vs-actual'
 const calls = []
 const variables = { ISOTOOLS_API_KEY: 'old-fixture-key' }
 const cli = (args, input) => { calls.push({ args, input }); return { success: true } }
+const candidateSecrets = { SESSION_SECRET: 'fixture-new-session-secret-of-at-least-32-characters', TOOL_API_KEY: 'fixture-new-machine-key-of-at-least-32-characters' }
+assert.deepEqual(missingRuntimeSecrets({}, candidateSecrets), candidateSecrets)
+assert.deepEqual(missingRuntimeSecrets({ SESSION_SECRET: null, TOOL_API_KEY: candidateSecrets.TOOL_API_KEY }, candidateSecrets), {}, 'existing session secrets and matching machine keys are preserved')
+assert.deepEqual(missingRuntimeSecrets({ SESSION_SECRET: 'different-existing-session-secret' }, candidateSecrets), { TOOL_API_KEY: candidateSecrets.TOOL_API_KEY }, 'session secrets are never rotated')
+assert.deepEqual(missingRuntimeSecrets({}, {}), {})
+assert.throws(() => missingRuntimeSecrets({ TOOL_API_KEY: 'different-existing-key' }, candidateSecrets), /existing_tool_key_requires_review/)
+assert.throws(() => missingRuntimeSecrets({ TOOL_API_KEY: null }, candidateSecrets), /existing_tool_key_requires_review/, 'sealed machine key cannot be replaced using a candidate')
+assert.throws(() => missingRuntimeSecrets({}, { ...candidateSecrets, SESSION_SECRET: 'short' }), /invalid_supplied_runtime_secret/)
+assert.throws(() => missingRuntimeSecrets({}, { ...candidateSecrets, TOOL_API_KEY: candidateSecrets.TOOL_API_KEY + '\ninjected' }), /invalid_supplied_runtime_secret/)
+const secretWrites = []
+const secretVariables = {}
+assert.deepEqual(configureRuntimeSecrets(secretVariables, service, missingRuntimeSecrets(secretVariables, candidateSecrets), (args, input) => secretWrites.push({ args, input })), ['SESSION_SECRET', 'TOOL_API_KEY'])
+assert.deepEqual(secretVariables, candidateSecrets)
+assert.equal(secretWrites.length, 2)
+for (const call of secretWrites) {
+  assert.ok(call.args.includes('--stdin') && call.args.includes('--skip-deploys'))
+  assert.ok(call.args.every(arg => !Object.values(candidateSecrets).some(secret => arg.includes(secret))), 'runtime secrets never appear in CLI arguments')
+  assert.ok(Object.values(candidateSecrets).includes(call.input))
+}
 const acceptedKey = async (url, options) => {
   assert.equal(options.method, undefined, 'key verification is GET only')
   assert.equal(options.headers['x-api-key'], 'valid-fixture-key')

@@ -2,9 +2,31 @@
 
 Fecha: 19 de octubre de 2026.
 
+Avance de aplicación: el usuario pidió trabajar nuestras actividades pendientes. Se configuraron en Actions del fork los cuatro secretos nuevos `COMPARE_SESSION_SECRET`, `TRACK_SESSION_SECRET`, `COMPARE_TOOL_API_KEY` y `TRACK_TOOL_API_KEY`, desde los archivos locales por stdin y sin imprimir sus valores. La preparación ahora incorpora únicamente secretos ausentes en Railway, valida primero el plan completo y conserva secretos de sesión existentes. Si una key de máquina existente no coincide con la de CI, se detiene para evitar reemplazarla. Las regresiones pasaron en Windows y Node 22 Linux. La aplicación en Railway y su validación se registrarán al terminar el despliegue.
+
 La parte de código de nuestras dos tools está corregida y probada. Las correcciones se publicaron en nuestro fork, rama `comm/sync_erp_data_local__compare_planned_vs_actual`, commit `328519533296861d179fca7c1bff08b1db85a97f`, confirmado por la API de GitHub. Este documento no declara que el SSO esté activo en Railway. No se desplegó, cambiaron variables remotas ni publicaron eventos QA al core durante esta implementación.
 
-Actualización de aplicación: se pudo publicar el código por separado porque los workflows de despliegue reaccionan únicamente a push en main y no hay PR abierto para esta rama. La revisión automática volvió a rechazar el comando que también solicitaba ejecutar el workflow de inspección con secretos y acceso a Railway. No se lanzó ese workflow. La siguiente operación pendiente es autorizar explícitamente `deploy-tools.yml`, `tool=all`, `mode=inspect`, `activate_consumer=false` sobre nuestra rama.
+Actualización de aplicación: tras la autorización explícita del usuario, se ejecutó [la inspección 39329650233](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233) sobre el commit `cc836cd6c2ea4ef2dff1787cc55b1f724d62de16`, con `tool=all`, `mode=inspect` y `activate_consumer=false`. Terminó correctamente el 19 de octubre a las 21:43 UTC (15:43 de Ciudad de México). Los pasos de preparación, escritura de variables, despliegue y publicación QA quedaron omitidos. Que el workflow esté verde acredita la ejecución de la inspección, no la aceptación productiva.
+
+## Resultado de la inspección autorizada
+
+| Comprobación | Compare | Track |
+| --- | --- | --- |
+| Issuer, ID y secreto de aplicación presentes | Sí | Sí |
+| Callback configurada coincide con la URL propia | Sí | Sí |
+| SESSION_SECRET | Ausente | Ausente |
+| TOOL_API_KEY para QA automatizada | Ausente | Ausente |
+| URL del core y API key válidas; suscripción HTTP 200 | Sí | Sí |
+| Consumidor habilitado y volumen persistente en /data | Sí | Sí |
+| Ruta del estado coincide con el volumen | Sí | Sí |
+| Versión servida | `1e071b02d1c21fa4bef5ea41ad7a2389d1f1e1fb` | `1e071b02d1c21fa4bef5ea41ad7a2389d1f1e1fb` |
+| Autenticación servida | Abierta | Abierta |
+| Rechazo de sesión/API anónima | No | No |
+| Assets públicos revisados con prefijos reales de API key y secreto de aplicación | Sin coincidencias | Sin coincidencias |
+
+La única variable obligatoria de SSO que el inventario informa ausente es `SESSION_SECRET`. La presencia de credenciales y una callback correcta en Railway no verifica la aplicación, las URIs registradas ni los roles en Logto: eso requiere un login real después de configurar y desplegar. No hay secreto de sesión remoto con el que contrastar los assets. Tampoco hay `TOOL_BUSINESS_CONFIG_FILE`; no se concluye por ello que falte toda configuración empresarial.
+
+El siguiente cambio remoto concreto sería cargar un secreto de sesión independiente por tool y desplegar el código corregido. Para la QA automática también se necesita `TOOL_API_KEY` independiente por backend y su copia en `COMPARE_TOOL_API_KEY` / `TRACK_TOOL_API_KEY` de Actions. Los candidatos locales ya existen, pero siguen sin aplicarse. La autorización recibida cubrió únicamente la inspección.
 
 ## Cambios implementados
 
@@ -74,14 +96,14 @@ La revisión posterior de secretos encontró y corrigió un archivo local de fro
 
 ## Aplicación remota pendiente
 
-La auditoría anterior encontró ambas tools abiertas y un registro QA por servicio. No se cambió ese estado durante esta implementación. Las comprobaciones de aceptación productiva siguen pendientes hasta aplicar y probar esta versión.
+La inspección privada confirmó que ambas tools siguen abiertas y sirven la versión anterior. La auditoría anterior encontró un registro QA por servicio. No se cambió ese estado durante esta implementación. Las comprobaciones de aceptación productiva siguen pendientes hasta aplicar y probar esta versión.
 
-La ejecución del workflow de inspección privada había sido rechazada por la revisión automática de permisos porque utiliza secretos del repositorio y acceso a Railway sin autorización explícita para ese workflow. No se intentó eludir ese rechazo. El código actual está preparado para revisión antes de publicar o desplegar.
+La revisión automática inicialmente requirió autorización explícita para el workflow de inspección. El usuario la concedió y la ejecución finalizó correctamente; esa barrera de inspección ya está resuelta. No se desplegó ni se modificaron variables.
 
 Orden de aplicación:
 
-1. Autorizar la inspección privada de la rama verificada, con `deploy-tools.yml`, `tool=all`, `mode=inspect`, `activate_consumer=false`.
-2. Confirmar variables y volumen de cada servicio, preservar secretos ya existentes y acordar con el líder los que falten. Nunca imprimir ni pasar secretos como argumentos de CLI.
+1. Completado: inspección privada de la rama verificada, con `deploy-tools.yml`, `tool=all`, `mode=inspect`, `activate_consumer=false`.
+2. Completado: comprobación de variables, key central y volumen. Pendiente aplicar los secretos de sesión ausentes y, para QA automatizada, las credenciales propias de las tools. Preservar los secretos existentes; nunca imprimir ni pasar secretos como argumentos de CLI.
 3. Confirmar las dos aplicaciones Logto, callbacks, logout y usuarios/roles con plataforma. Los campos faltantes detienen el despliegue antes de escribir variables.
 4. Los cambios ya están publicados en la rama de trabajo. Falta ejecutar las pruebas/despliegue con SSO configurado, conservando los volúmenes y consumidores activos.
 5. Validar login real, 401 anónimo, deep links, logout y permisos con cuentas de Logto.

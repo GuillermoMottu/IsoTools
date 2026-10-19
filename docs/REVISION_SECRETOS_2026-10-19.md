@@ -6,6 +6,8 @@ La revisión se completó localmente antes de publicar. Posteriormente, las corr
 
 ## Resultado
 
+Actualización remota: la [inspección autorizada 39329650233](https://github.com/GuillermoMottu/IsoTools/actions/runs/39329650233), del 19 de octubre a las 21:43 UTC, revisó los assets públicos de ambas tools contra marcadores y prefijos reales de su API key central y secreto de aplicación. No encontró coincidencias. Los valores se mantuvieron en memoria del runner y los informes contienen únicamente estados. `SESSION_SECRET` y `TOOL_API_KEY` están ausentes en ambos servicios; no se acredita una comparación con secretos inexistentes. Ambas tools siguen abiertas en producción, un pendiente de control de acceso independiente de estos resultados sobre assets. No se cambiaron secretos remotos.
+
 No se detectaron credenciales reales incrustadas en los archivos publicables mediante los patrones revisados, ni copias de los cinco valores privados locales comparados en esos archivos o en los objetos Git examinados. Las coincidencias heurísticas se contrastaron con el código: correspondían a nombres de campos, referencias a variables de entorno, placeholders, credenciales de pruebas o contraseñas de desarrollo documentadas.
 
 Sí se encontró una key preexistente en `demo-frontend/.env.local`, bajo `VITE_ISOTOOLS_API_KEY`. Estaba ignorada por Git y no se encontró en los builds ni en los dos bundles publicados revisados. Aun así, era una ubicación inadecuada para un secreto de backend y las exclusiones de Docker permitían copiar ese archivo en una construcción local. Se corrigió antes de publicar.
@@ -60,6 +62,6 @@ El JSON de resultados conserva candidatos del escaneo inicial, no una lista de f
 
 Fue un escaneo heurístico local y una revisión dirigida, no una certificación integral de seguridad. No se ejecutaron Gitleaks o TruffleHog porque no estaban instalados. El escáner limitaba blobs históricos a 2 MB y omitía binarios; en esta ejecución no hubo omisiones por esos dos límites.
 
-No se descargaron referencias Git nuevas, no se auditaron todos los logs o artefactos históricos de Actions, no se inspeccionaron secretos privados de Railway y no se ejecutó un análisis de vulnerabilidades de dependencias ni una prueba de penetración.
+No se descargaron referencias Git nuevas, no se auditaron todos los logs o artefactos históricos de Actions y no se ejecutó un análisis de vulnerabilidades de dependencias ni una prueba de penetración. Posteriormente sí se inspeccionó la configuración privada de ambas tools en Railway mediante el workflow autorizado: los secretos se usaron en memoria para las comprobaciones descritas, sin incluir sus valores en los informes. Esto no constituye una auditoría de todos los secretos del proyecto Railway.
 
 Los hallazgos corregidos pertenecen al código y configuración locales. La activación de SSO, el reinicio real del volumen y la aceptación productiva continúan pendientes del despliegue autorizado y de los datos/roles que debe confirmar plataforma.
