@@ -120,8 +120,14 @@ no tiene humano detrás; su payload registra el proceso que la originó.
 
 ## 5. Probar sin IdP
 
-Sin `OIDC_ISSUER` tu servicio corre **abierto**, igual que antes de esta plantilla.
-Ese es el default de desarrollo y mantiene tu repo usable sin levantar nada.
+En desarrollo, sin `OIDC_ISSUER` ni `ISSUER_ENDPOINT` ni credenciales parciales,
+el servicio puede correr abierto. Con `NODE_ENV=production` exige SSO completo,
+issuer y callback HTTPS y cookies Secure; no arranca en modo abierto.
+
+También acepta los nombres que entrega Logto: `ISSUER_ENDPOINT`, `APP_ID` y
+`APP_SECRETS`, equivalentes a `OIDC_ISSUER`, `OIDC_CLIENT_ID` y
+`OIDC_CLIENT_SECRET`. Los nombres OIDC explícitos tienen prioridad. La variable
+`OIDC_REDIRECT_URI` debe coincidir exactamente con la callback registrada en Logto.
 
 Para probar el gating de roles sin un IdP real, firma tú una cookie válida:
 

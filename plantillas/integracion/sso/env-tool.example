@@ -10,7 +10,7 @@ UI_DIST_DIR=./ui/dist
 # -- Plataforma IsoTools (plano MAQUINA) --------------------------------------
 # Tu clave para publicar y consumir eventos en el core. Se queda DEL LADO DEL
 # SERVIDOR: jamas llega al navegador.
-ISOTOOLS_API_URL=https://isotools-production.up.railway.app/api/v1
+ISOTOOLS_API_URL=https://api-events.orcalabs.mx/api/v1
 ISOTOOLS_API_KEY=
 
 # Clave con la que OTROS servicios (el bus, una saga, otra tool) te llaman a ti.
@@ -20,12 +20,15 @@ TOOL_API_KEY=
 # =============================================================================
 # SINGLE SIGN-ON (plano HUMANO)
 # =============================================================================
-# El SSO se activa por PRESENCIA de OIDC_ISSUER. Sin el, tu servicio corre ABIERTO
-# (desarrollo local). Con el puesto pero incompleto, el proceso NO arranca: auth a
-# medias es peor que auth ausente, porque parece protegida y no lo esta.
+# Produccion (NODE_ENV=production) exige SSO completo y cookies Secure.
+# Solo desarrollo sin configuracion de identidad permite modo abierto.
 #
-# Los tres primeros valores te los da el equipo de plataforma.
+# Plataforma puede entregar los nombres de Logto; no hace falta duplicarlos.
+ISSUER_ENDPOINT=
+APP_ID=
+APP_SECRETS=
 
+# Los nombres OIDC explicitos tienen prioridad sobre los alias anteriores.
 OIDC_ISSUER=
 OIDC_CLIENT_ID=
 OIDC_CLIENT_SECRET=

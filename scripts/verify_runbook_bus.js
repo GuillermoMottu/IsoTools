@@ -30,7 +30,20 @@ try {
   for (const toolId of selected) {
     const contract = TOOL_CONTRACTS[toolId]
     const toolBase = toolId === 'compare_planned_vs_actual' ? 'https://cpa.orcalabs.mx' : 'https://tpp.orcalabs.mx'
-    if (deployed) assert.equal((await fetch(`${toolBase}/ready`, { redirect: 'error', signal: AbortSignal.timeout(15000) })).status, 200, 'deployed consumer must already be ready')
+    const toolKey = process.env[toolId === 'compare_planned_vs_actual' ? 'COMPARE_TOOL_API_KEY' : 'TRACK_TOOL_API_KEY']?.trim()
+    async function readStatus () {
+      const response = await fetch(`${toolBase}/api/tool/status`, { headers: toolKey ? { 'x-api-key': toolKey } : undefined, redirect: 'error', signal: AbortSignal.timeout(15000) })
+      if ([401, 403].includes(response.status)) throw new Error('deployed_consumer_credentials_required')
+      if (!response.ok) throw new Error(`tool_status_http_${response.status}`)
+      return response.json()
+    }
+    if (deployed) {
+      assert.equal((await fetch(`${toolBase}/ready`, { redirect: 'error', signal: AbortSignal.timeout(15000) })).status, 200, 'deployed consumer must already be ready')
+      const health = await fetch(`${toolBase}/health`, { redirect: 'error', signal: AbortSignal.timeout(15000) })
+      assert.equal(health.status, 200)
+      assert.equal((await health.json()).auth, 'sso', 'production QA requires SSO')
+      await readStatus() // Verify access before publishing any test input.
+    }
     const catalog = (await request(`/catalog/tools/${toolId}`)).payload
     assert.ok(catalog.consumes.includes(contract.consumes), 'central input contract matches')
     assert.ok(catalog.produces.includes(contract.produces), 'central output contract matches')
@@ -65,9 +78,7 @@ try {
     let snapshot
     if (deployed) {
       for (let attempt = 0; attempt < 15; attempt++) {
-        const response = await fetch(`${toolBase}/api/tool/status`, { redirect: 'error', signal: AbortSignal.timeout(15000) })
-        assert.equal(response.status, 200)
-        snapshot = await response.json()
+        snapshot = await readStatus()
         if (snapshot.last_publication?.correlation_id === inputId) break
         await setTimeout(2000)
       }
@@ -96,7 +107,7 @@ try {
   console.log(JSON.stringify(report, null, 2))
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### Runbook: pruebas marcadas en bus central\n\nEjecución: ${report.execution}. No activa servicios ni reinicia el volumen Railway.\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`)
 } catch (error) {
-  const code = /^central_http_\d+$/.test(error.message) ? error.message : 'runbook_bus_validation_failed'
+  const code = /^(central_http_\d+|tool_status_http_\d+|deployed_consumer_credentials_required)$/.test(error.message) ? error.message : 'runbook_bus_validation_failed'
   console.error(JSON.stringify({ error: code, test_prefix: prefix, completed_tools: report.tests.map(test => test.tool) }))
   process.exitCode = 1
 } finally { await rm(dir, { recursive: true, force: true }) }

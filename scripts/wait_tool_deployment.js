@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout } from 'node:timers/promises'
 
 export function deploymentIsCurrent (health, toolId, sha) {
-  return health?.status === 'ok' && health.service === 'isotools-tool' && health.tool === toolId && health.auth === 'open' && health.build_sha === sha
+  return health?.status === 'ok' && health.service === 'isotools-tool' && health.tool === toolId && health.auth === 'sso' && health.build_sha === sha
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -14,7 +14,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     try {
       const response = await fetch(HEALTH_URL, { redirect: 'error', signal: AbortSignal.timeout(5000) })
       if (response.ok && deploymentIsCurrent(await response.json(), TOOL_PAGE_ID, GITHUB_SHA)) {
-        console.log(`${TOOL_PAGE_ID}: expected build healthy and SSO open`)
+        console.log(`${TOOL_PAGE_ID}: expected build healthy and SSO enabled`)
         ready = true
         break
       }

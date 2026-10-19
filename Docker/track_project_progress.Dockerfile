@@ -13,7 +13,7 @@ RUN npm ci
 COPY demo-frontend/ ./
 COPY src/utils/ /src/utils/
 ENV VITE_TOOL_ID=track_project_progress
-RUN VITE_DASHBOARD_URL="${VITE_DASHBOARD_URL}" npm run build
+RUN VITE_DASHBOARD_URL="${VITE_DASHBOARD_URL}" npm run build -- --manifest assets/manifest.json
 
 FROM ${NODE_IMAGE} AS runtime
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0

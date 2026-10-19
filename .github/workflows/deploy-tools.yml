@@ -71,6 +71,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: Test SSO and runtime checks before changing Railway
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: |
+          corepack enable
+          pnpm install --prod --frozen-lockfile
+          node scripts/test_sso_configuration.js
+          node scripts/test_railway_inspection.js
+          node scripts/test_railway_preparation.js
+          node scripts/test_runbook_deployed_auth.js
+          node scripts/test_runbook_consumer.js
+          node scripts/test_tool_service.js
+          node scripts/test_sso_handshake.js
+
       - name: Install Railway CLI
         run: npm i -g @railway/cli@5.67.1
 
@@ -101,7 +114,7 @@ jobs:
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/wait_tool_deployment.js
 
-      - name: Verify deployed tool identity and open SSO
+      - name: Verify deployed identity, required SSO and secret-free assets
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/inspect_railway_tool.js --require-deployed-tool
 
@@ -143,6 +156,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: Test SSO and runtime checks before changing Railway
+        if: ${{ env.DEPLOY_REQUESTED == 'true' }}
+        run: |
+          corepack enable
+          pnpm install --prod --frozen-lockfile
+          node scripts/test_sso_configuration.js
+          node scripts/test_railway_inspection.js
+          node scripts/test_railway_preparation.js
+          node scripts/test_runbook_deployed_auth.js
+          node scripts/test_runbook_consumer.js
+          node scripts/test_tool_service.js
+          node scripts/test_sso_handshake.js --track
+
       - name: Install Railway CLI
         run: npm i -g @railway/cli@5.67.1
 
@@ -173,7 +199,7 @@ jobs:
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/wait_tool_deployment.js
 
-      - name: Verify deployed tool identity and open SSO
+      - name: Verify deployed identity, required SSO and secret-free assets
         if: ${{ env.DEPLOY_REQUESTED == 'true' }}
         run: node scripts/inspect_railway_tool.js --require-deployed-tool
 
@@ -195,4 +221,6 @@ jobs:
           ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
           TOOL_SELECTED: ${{ inputs.tool }}
           VERIFY_DEPLOYED_CONSUMER: 'true'
+          COMPARE_TOOL_API_KEY: ${{ secrets.COMPARE_TOOL_API_KEY }}
+          TRACK_TOOL_API_KEY: ${{ secrets.TRACK_TOOL_API_KEY }}
         run: node scripts/verify_runbook_bus.js

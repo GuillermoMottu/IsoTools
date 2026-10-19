@@ -3,9 +3,7 @@
 // COPIA ESTE ARCHIVO TAL CUAL. Solo cambia el valor por defecto de
 // `SESSION_COOKIE_NAME` por el nombre de tu tool.
 //
-// El SSO se activa por PRESENCIA de `OIDC_ISSUER`. Sin la variable, tu servicio
-// corre abierto: es el default de desarrollo local y deja tu repo utilizable sin
-// levantar un IdP.
+// Logto y OIDC usan los mismos campos. Solo desarrollo permite correr sin IdP.
 //
 // No existe el estado "a medias": si el issuer esta puesto y falta cualquier valor
 // requerido, esto LANZA y el proceso NO arranca. Un servicio que parece protegido y
@@ -21,10 +19,21 @@ export class AuthConfigurationError extends Error {
   }
 }
 
-// Devuelve `null` cuando `OIDC_ISSUER` no esta puesto (SSO apagado).
+// Devuelve null solamente para desarrollo sin configuracion de identidad.
 export function resolveAuthConfig (env = process.env) {
+  env = {
+    ...env,
+    OIDC_ISSUER: env.OIDC_ISSUER?.trim() || env.ISSUER_ENDPOINT?.trim(),
+    OIDC_CLIENT_ID: env.OIDC_CLIENT_ID?.trim() || env.APP_ID?.trim(),
+    OIDC_CLIENT_SECRET: env.OIDC_CLIENT_SECRET?.trim() || env.APP_SECRETS?.trim()
+  };
   const issuerRaw = env.OIDC_ISSUER?.trim();
-  if (!issuerRaw) return null;
+  if (!issuerRaw) {
+    if (env.NODE_ENV === 'production' || env.OIDC_CLIENT_ID || env.OIDC_CLIENT_SECRET) {
+      throw new AuthConfigurationError('OIDC_ISSUER o ISSUER_ENDPOINT es obligatorio');
+    }
+    return null;
+  }
 
   const issuer = parseIssuer(issuerRaw);
   const sessionSecret = required(env.SESSION_SECRET, 'SESSION_SECRET');
@@ -33,13 +42,22 @@ export function resolveAuthConfig (env = process.env) {
   if (sessionSecret.length < 32) {
     throw new AuthConfigurationError('SESSION_SECRET debe tener al menos 32 caracteres');
   }
+  const redirectUri = required(env.OIDC_REDIRECT_URI, 'OIDC_REDIRECT_URI');
+  if (env.NODE_ENV === 'production') {
+    if (issuer.protocol !== 'https:' || new URL(redirectUri).protocol !== 'https:') {
+      throw new AuthConfigurationError('El issuer y callback de produccion requieren HTTPS');
+    }
+    if (env.SESSION_INSECURE_COOKIES === 'true') {
+      throw new AuthConfigurationError('Las cookies de produccion requieren Secure');
+    }
+  }
 
   return {
     issuer,
     clientId: required(env.OIDC_CLIENT_ID, 'OIDC_CLIENT_ID'),
     clientSecret: required(env.OIDC_CLIENT_SECRET, 'OIDC_CLIENT_SECRET'),
     // Debe coincidir EXACTO con la URI que el IdP tiene en su lista blanca.
-    redirectUri: required(env.OIDC_REDIRECT_URI, 'OIDC_REDIRECT_URI'),
+    redirectUri,
     // Normalmente el dashboard: https://<dominio>/
     postLogoutRedirectUri: env.OIDC_POST_LOGOUT_REDIRECT_URI?.trim() || undefined,
     // `roles` no es un scope OIDC estandar, pero es como los proveedores que usamos
@@ -62,7 +80,7 @@ function parseIssuer (raw) {
   try {
     return new URL(raw);
   } catch {
-    throw new AuthConfigurationError(`OIDC_ISSUER no es una URL valida: ${raw}`);
+    throw new AuthConfigurationError('OIDC_ISSUER no es una URL valida');
   }
 }
 

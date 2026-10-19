@@ -21,7 +21,7 @@ let tool
 const server = http.createServer((req, res) => tool.app(req, res))
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}`
-Object.assign(process.env, { OIDC_ISSUER: issuer, OIDC_CLIENT_ID: clientId, OIDC_CLIENT_SECRET: 'fixture-client-secret', OIDC_REDIRECT_URI: `${base}/auth/callback`, SESSION_SECRET: secret, SESSION_COOKIE_NAME: cookieName, SESSION_INSECURE_COOKIES: '', TOOL_API_KEY: '', TOOL_PAGE_ID: toolId, TOOL_CONSUMER_ENABLED: 'false', TOOL_STATE_DIR: path.join(temp, 'state'), WEB_DIST_DIR: path.join(temp, 'dist') })
+Object.assign(process.env, { NODE_ENV: 'test', OIDC_ISSUER: '', OIDC_CLIENT_ID: '', OIDC_CLIENT_SECRET: '', ISSUER_ENDPOINT: issuer, APP_ID: clientId, APP_SECRETS: 'fixture-client-secret', OIDC_REDIRECT_URI: `${base}/auth/callback`, SESSION_SECRET: secret, SESSION_COOKIE_NAME: cookieName, SESSION_INSECURE_COOKIES: '', TOOL_API_KEY: '', TOOL_PAGE_ID: toolId, TOOL_CONSUMER_ENABLED: 'false', TOOL_STATE_DIR: path.join(temp, 'state'), WEB_DIST_DIR: path.join(temp, 'dist') })
 globalThis.fetch = async (url, options) => {
   const parsed = new URL(typeof url === 'string' ? url : url.url || url.href)
   if (parsed.origin !== issuer) return originalFetch(url, options)
@@ -57,10 +57,16 @@ try {
   await mkdir(process.env.WEB_DIST_DIR)
   await writeFile(path.join(process.env.WEB_DIST_DIR, 'index.html'), '<html>fixture tool</html>')
   await writeFile(path.join(process.env.WEB_DIST_DIR, 'asset.js'), 'console.log("public asset")')
+  await mkdir(path.join(process.env.WEB_DIST_DIR, 'assets'))
+  await writeFile(path.join(process.env.WEB_DIST_DIR, 'assets/manifest.json'), JSON.stringify({ 'index.html': { file: 'assets/app.js', isEntry: true } }))
+  await writeFile(path.join(process.env.WEB_DIST_DIR, 'assets/app.js'), 'console.log("public build asset")')
   const { createToolApp } = await import('../src/tool-server.js')
   tool = await createToolApp()
   assert.equal((await originalFetch(`${base}/health`)).status, 200)
   assert.equal((await originalFetch(`${base}/asset.js`, { redirect: 'manual' })).status, 200)
+  assert.equal((await originalFetch(`${base}/assets/manifest.json`, { redirect: 'manual' })).status, 200)
+  assert.equal((await originalFetch(`${base}/auth/me`, { redirect: 'manual' })).status, 401)
+  assert.equal((await originalFetch(`${base}/api/tool/status`, { redirect: 'manual' })).status, 401)
   const unauthenticated = await originalFetch(base + recordPath, { redirect: 'manual' })
   assert.equal(unauthenticated.status, 401)
   assert.equal((await unauthenticated.json()).error, 'authentication_required')
@@ -89,7 +95,7 @@ try {
     assert.ok(!invalid.headers.getSetCookie().some(value => value.startsWith(`${cookieName}=`)), mode)
   }
   mode = 'valid'
-  for (idpRoles of [['platform.auditor'], ['unknown.admin']]) {
+  for (idpRoles of [['platform.auditor'], ['unknown.admin'], []]) {
     const signedIn = await login()
     const cookie = cookies(signedIn)
     const request = await originalFetch(`${base}/api/tool/${toolId}/run`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: '{"input":{},"authorizedByRole":"OperationsManager"}' })

@@ -25,7 +25,8 @@ export async function configureCentralKey (variables, toolId, service, suppliedK
 
 export function runtimePlan (toolId, service, variables, volumeList) {
   if (!COOKIES[toolId] || !service || !Array.isArray(volumeList.volumes)) throw new Error('invalid_runtime_configuration')
-  if (!inspectConfiguration(variables, toolId).open_mode_configured) throw new Error('existing_authentication_requires_review')
+  const configuration = inspectConfiguration(variables, toolId)
+  if (!configuration.sso_configured || !configuration.redirect_uri_matches) throw new Error('sso_configuration_incomplete')
   const volumes = volumeList.volumes.filter(volume => volume.serviceName === service && !volume.deletedAt)
   if (volumes.length > 1 || volumes.some(volume => volume.isPendingDeletion)) throw new Error('existing_volume_requires_review')
   const mount = volumes[0]?.mountPath || '/data'
@@ -83,7 +84,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(JSON.stringify({ tool: toolId, runtime_variables_configured: true, volume_created: plan.createVolume, existing_volume_preserved: !plan.createVolume, active_consumer_preserved: variables.TOOL_CONSUMER_ENABLED === 'true', consumer_activation_requested: activate, supplied_central_key_verified: keyResult.supplied, central_key_changed: keyResult.changed }))
   } catch (error) {
     // CLI stdout/stderr may contain credentials. Report only known local failure codes.
-    const safe = ['invalid_runtime_configuration', 'existing_authentication_requires_review', 'existing_volume_requires_review', 'existing_state_directory_requires_review', 'invalid_volume_mount', 'missing_railway_token', 'missing_build_revision', 'missing_volume_service_id', 'sealed_central_key_requires_review', 'supplied_central_key_rejected', 'active_consumer_requires_valid_central_key'].includes(error.message) ? error.message : 'runtime_preparation_failed'
+    const safe = ['invalid_runtime_configuration', 'sso_configuration_incomplete', 'existing_volume_requires_review', 'existing_state_directory_requires_review', 'invalid_volume_mount', 'missing_railway_token', 'missing_build_revision', 'missing_volume_service_id', 'sealed_central_key_requires_review', 'supplied_central_key_rejected', 'active_consumer_requires_valid_central_key'].includes(error.message) ? error.message : 'runtime_preparation_failed'
     console.error(JSON.stringify({ stage, error: error.message === 'consumer_registration_not_ready' ? error.message : safe }))
     process.exitCode = 1
   }

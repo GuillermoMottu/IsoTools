@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { inspectConfiguration, inspectConnection, hasDataVolume, inspectFrontendBundle } from './inspect_railway_tool.js'
 
-const vars = { ISOTOOLS_API_URL: 'https://api-events.orcalabs.mx/api/v1', ISOTOOLS_API_KEY: 'secret-fixture-not-for-logs', RAILWAY_PUBLIC_DOMAIN: 'fixture.up.railway.app', RAILWAY_VOLUME_MOUNT_PATH: '/data', SESSION_SECRET: 'another-secret-fixture' }
+const vars = { ISOTOOLS_API_URL: 'https://api-events.orcalabs.mx/api/v1', ISOTOOLS_API_KEY: 'secret-fixture-not-for-logs', RAILWAY_PUBLIC_DOMAIN: 'fixture.up.railway.app', RAILWAY_VOLUME_MOUNT_PATH: '/data', SESSION_SECRET: 'another-session-secret-fixture-at-least-32-characters', ISSUER_ENDPOINT: 'https://idp.fixture.invalid/oidc', APP_ID: 'fixture-client', APP_SECRETS: 'logto-secret-fixture-not-for-logs', OIDC_REDIRECT_URI: 'https://cpa.orcalabs.mx/auth/callback' }
 const calls = []
 const report = await inspectConnection(vars, 'compare_planned_vs_actual', '', async (url, options) => {
   calls.push({ url, options })
@@ -12,8 +12,14 @@ assert.equal(report.volume_mounted_at_data, true)
 assert.equal(report.health_url, 'https://fixture.up.railway.app/health')
 assert.equal(report.deployed_tool_identity_matches, true)
 assert.equal(report.deployed_auth_mode_open, true)
+assert.equal(report.sso_configured, true)
+assert.deepEqual(report.sso_missing_variables, [])
+assert.equal(report.tool_api_key_configured, false)
+assert.equal(report.redirect_uri_matches, true)
 assert.ok(!JSON.stringify(report).includes(vars.ISOTOOLS_API_KEY))
 assert.ok(!JSON.stringify(report).includes(vars.SESSION_SECRET))
+assert.ok(!JSON.stringify(report).includes(vars.APP_SECRETS))
+assert.deepEqual(inspectConfiguration({ ...vars, APP_SECRETS: '', SESSION_SECRET: '' }, 'compare_planned_vs_actual').sso_missing_variables, ['OIDC_CLIENT_SECRET/APP_SECRETS', 'SESSION_SECRET'])
 assert.ok(calls.every(call => !call.options.method || call.options.method === 'GET'))
 assert.equal(calls[0].options.headers['x-api-key'], vars.ISOTOOLS_API_KEY)
 assert.equal(calls[1].options.headers, undefined, 'health must be anonymous')
@@ -44,6 +50,31 @@ for (const leak of [false, true]) {
   })
   assert.equal(report.frontend_bundle_checked, true)
   assert.equal(report.frontend_actual_key_checked, true)
+  assert.equal(report.frontend_actual_client_secret_checked, true)
+  assert.equal(report.frontend_actual_session_secret_checked, true)
   assert.equal(report.frontend_key_leak, leak)
   assert.ok(!JSON.stringify(report).includes(vars.ISOTOOLS_API_KEY))
 }
+const protectedTool = await inspectConnection(vars, 'compare_planned_vs_actual', 'https://cpa.orcalabs.mx/health', async url => {
+  if (url.includes('/subscriptions/')) return Response.json({ consumer: 'compare_planned_vs_actual', consumes: ['ERP_SALES_PERIOD_CLOSED'], events: [] })
+  if (url.endsWith('/auth/me')) return Response.json({ mode: 'sso', authenticated: false }, { status: 401 })
+  if (url.endsWith('/api/tool/status')) return Response.json({ error: 'authentication_required' }, { status: 401 })
+  return Response.json({ tool: 'compare_planned_vs_actual', auth: 'sso', build_sha: 'a'.repeat(40) })
+})
+assert.equal(protectedTool.deployed_auth_mode_sso, true)
+assert.equal(protectedTool.anonymous_session_rejected, true)
+assert.equal(protectedTool.anonymous_api_rejected, true)
+for (const secret of ['APP_SECRETS', 'SESSION_SECRET', 'OIDC_CLIENT_SECRET']) {
+  const fixture = { ...vars, [secret]: 'distinct-secret-prefix-for-test' }
+  const result = await inspectFrontendBundle(fixture, 'https://cpa.orcalabs.mx/health', async (url, options) => {
+    assert.equal(options.headers, undefined, 'neither session nor API credentials go to public assets')
+    if (url === 'https://cpa.orcalabs.mx') return new Response(null, { status: 302, headers: { location: '/auth/login' } })
+    if (url.endsWith('/assets/manifest.json')) return Response.json({ 'index.html': { file: 'assets/app.js', isEntry: true } })
+    return new Response(fixture[secret].slice(0, 8))
+  })
+  assert.equal(result.frontend_bundle_checked, true)
+  assert.equal(result.frontend_key_leak, true, `${secret} value is detected behind a protected shell`)
+}
+const sealedClient = await inspectFrontendBundle({ ...vars, OIDC_CLIENT_SECRET: null }, 'https://cpa.orcalabs.mx/health', async url => url.endsWith('/assets/app.js') ? new Response('safe') : new Response('<script src="/assets/app.js"></script>', { headers: { 'content-type': 'text/html' } }))
+assert.equal(sealedClient.frontend_actual_client_secret_checked, false, 'a readable inactive alias cannot certify a sealed active secret')
+console.log('Railway inspection: SSO 401, protected-shell manifests and Logto/session secret scanning PASS')

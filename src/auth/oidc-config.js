@@ -57,7 +57,7 @@ function parseIssuer (raw) {
   try {
     return new URL(raw);
   } catch {
-    throw new AuthConfigurationError(`OIDC_ISSUER no es una URL valida: ${raw}`);
+    throw new AuthConfigurationError('OIDC_ISSUER no es una URL valida');
   }
 }
 
