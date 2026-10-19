@@ -2,7 +2,9 @@
 
 Fecha: 19 de octubre de 2026.
 
-La parte de código de nuestras dos tools está corregida y probada. Este documento acredita el cierre local; no declara que el SSO esté activo en Railway. No se hizo commit, push, despliegue, cambio de variables remoto ni publicación de eventos QA al core durante esta implementación.
+La parte de código de nuestras dos tools está corregida y probada. Las correcciones se publicaron en nuestro fork, rama `comm/sync_erp_data_local__compare_planned_vs_actual`, commit `328519533296861d179fca7c1bff08b1db85a97f`, confirmado por la API de GitHub. Este documento no declara que el SSO esté activo en Railway. No se desplegó, cambiaron variables remotas ni publicaron eventos QA al core durante esta implementación.
+
+Actualización de aplicación: se pudo publicar el código por separado porque los workflows de despliegue reaccionan únicamente a push en main y no hay PR abierto para esta rama. La revisión automática volvió a rechazar el comando que también solicitaba ejecutar el workflow de inspección con secretos y acceso a Railway. No se lanzó ese workflow. La siguiente operación pendiente es autorizar explícitamente `deploy-tools.yml`, `tool=all`, `mode=inspect`, `activate_consumer=false` sobre nuestra rama.
 
 ## Cambios implementados
 
@@ -81,7 +83,7 @@ Orden de aplicación:
 1. Autorizar la inspección privada de la rama verificada, con `deploy-tools.yml`, `tool=all`, `mode=inspect`, `activate_consumer=false`.
 2. Confirmar variables y volumen de cada servicio, preservar secretos ya existentes y acordar con el líder los que falten. Nunca imprimir ni pasar secretos como argumentos de CLI.
 3. Confirmar las dos aplicaciones Logto, callbacks, logout y usuarios/roles con plataforma. Los campos faltantes detienen el despliegue antes de escribir variables.
-4. Publicar los cambios revisados en la rama de trabajo y ejecutar las pruebas/despliegue con SSO configurado, conservando los volúmenes y consumidores activos.
+4. Los cambios ya están publicados en la rama de trabajo. Falta ejecutar las pruebas/despliegue con SSO configurado, conservando los volúmenes y consumidores activos.
 5. Validar login real, 401 anónimo, deep links, logout y permisos con cuentas de Logto.
 6. Ejecutar una QA marcada nueva y verificar salida y cadena exactas de cada consumidor desplegado.
 7. Coordinar reinicio real del servicio y prueba de fallo/recuperación; verificar persistencia y ausencia de duplicados.

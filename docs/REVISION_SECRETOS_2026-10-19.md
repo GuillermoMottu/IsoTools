@@ -2,7 +2,7 @@
 
 Fecha: 19 de octubre de 2026.
 
-La publicación propuesta tiene como destino el fork `https://github.com/GuillermoMottu/IsoTools`, en la rama `comm/sync_erp_data_local__compare_planned_vs_actual`. El remoto upstream `https://github.com/carcamfer/IsoTools` se mantiene como referencia. No se realizó commit, push, despliegue ni cambio de credenciales remotas durante esta revisión.
+La revisión se completó localmente antes de publicar. Posteriormente, las correcciones se publicaron en el fork `https://github.com/GuillermoMottu/IsoTools`, rama `comm/sync_erp_data_local__compare_planned_vs_actual`, commit `3285195`. El remoto upstream `https://github.com/carcamfer/IsoTools` se mantiene como referencia. No se desplegó ni cambiaron credenciales remotas y los archivos privados quedaron excluidos de la publicación.
 
 ## Resultado
 

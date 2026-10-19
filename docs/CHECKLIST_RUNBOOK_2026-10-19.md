@@ -2,7 +2,7 @@
 
 Fecha de revisión: 19 de octubre de 2026. Consulta remota principal: 10:31, America/Mexico_City.
 
-Actualización posterior del mismo día: se resolvieron localmente la compatibilidad Logto, el requisito SSO en producción, las comprobaciones de despliegue y la validación QA autenticada. Las tablas siguientes conservan la evidencia de la auditoría original; producción no se modificó. Cambios, secretos locales preparados, pruebas y pendientes en [CIERRE_LOCAL_SSO_COMPARE_TRACK.md](CIERRE_LOCAL_SSO_COMPARE_TRACK.md).
+Actualización posterior del mismo día: se resolvieron la compatibilidad Logto, el requisito SSO en producción, las comprobaciones de despliegue y la validación QA autenticada. Las correcciones se publicaron en nuestro fork en el commit `3285195`. Las tablas siguientes conservan la evidencia de la auditoría original; producción no se modificó y la inspección privada sigue pendiente de autorización explícita. Cambios, secretos locales preparados, pruebas y pendientes en [CIERRE_LOCAL_SSO_COMPARE_TRACK.md](CIERRE_LOCAL_SSO_COMPARE_TRACK.md).
 
 El proyecto todavía no cumple todos los requisitos del runbook actualizado. Las dos tools responden, sus contratos públicos coinciden y las pruebas locales pasan, pero ambas están abiertas sin autenticación en producción. También faltan aceptación con datos empresariales reales, pruebas operativas y alineación del registro central.
 
@@ -148,7 +148,7 @@ Quedan pendientes por ese bloqueo la lectura privada de variables, la verificaci
 ## Checklist de cierre restante
 
 - [x] Resolver los nombres de variables Logto en el código de las tools, validado localmente; falta aplicar la versión en Railway.
-- [x] Adaptar las comprobaciones de despliegue para exigir SSO en producción, validado localmente; falta publicar y aplicar el workflow actualizado.
+- [x] Adaptar las comprobaciones de despliegue para exigir SSO en producción, validado localmente y publicado en nuestro fork; falta aplicar el workflow actualizado.
 - [x] Preparar secretos independientes de sesión y credenciales de máquina en archivos locales ignorados, sin reemplazar ni enviar secretos existentes.
 - [ ] Inspeccionar la configuración privada y el volumen de ambas tools con autorización para el workflow de lectura.
 - [ ] Confirmar callback, logout, roles y cuentas de prueba con plataforma.
