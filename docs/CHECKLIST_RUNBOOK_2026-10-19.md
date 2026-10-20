@@ -1,5 +1,7 @@
 # Verificación del runbook de pruebas de IsoTools
 
+**Revisión vigente: [checklist completa del 20 de octubre](REVISION_CHECKLIST_RUNBOOK_2026-10-20.md).** Este informe conserva la evidencia histórica del 19. La revisión vigente recorre los 33 pasos, completa la inspección operativa por CI y separa los requisitos del documento de la aceptación empresarial adicional.
+
 Fecha de revisión: 19 de octubre de 2026. Auditoría inicial: 10:31; última verificación tras despliegue y QA: 15:57, America/Mexico_City.
 
 Se aplicaron los secretos faltantes y se [desplegaron ambas tools](https://github.com/GuillermoMottu/IsoTools/actions/runs/39330751889), con autorización explícita, sobre `0f7af25780308e516ebe7a55a65ddcb2b1a07e16`. Ambas sirven ese SHA con SSO y rechazan el acceso anónimo. La [QA marcada nueva](https://github.com/GuillermoMottu/IsoTools/actions/runs/39331063240) pasó. Se conservaron volúmenes, cursores, registros anteriores y key central. Resultado y evidencia en [CIERRE_LOCAL_SSO_COMPARE_TRACK.md](CIERRE_LOCAL_SSO_COMPARE_TRACK.md).
@@ -133,34 +135,36 @@ Estados: **Cumple** significa que hay evidencia para el alcance indicado; **Loca
 
 El validador informó 125 tools, 16 registradas y 10 roles. Conserva un aviso local sobre falta de subdominio de `detect_out_of_control_signals`; está fuera de las dos tools revisadas y el registro remoto ya muestra esa otra tool desplegada.
 
-Las pruebas se ejecutaron con Node v25.9.0 en Windows. Los Dockerfiles usan Node 22 Linux; no se ejecutaron esos contenedores. Las pruebas SSO usan la librería OIDC real con IdP simulado y no acreditan una sesión real de Logto.
+Esta batería inicial se ejecutó con Node v25.9.0 en Windows. Posteriormente se ejecutaron las regresiones con Node 22 Linux y se desplegaron los contenedores; la revisión del 20 añade procesos y HTTP reales con core aislado. Las pruebas SSO con IdP simulado no acreditan una sesión real de Logto.
 
 Los primeros intentos tuvieron restricciones del entorno: EPERM en temporales y EACCES al conectar a localhost. El consumidor pasó al usar temporales dentro del espacio autorizado; las pruebas HTTP locales pasaron al ejecutarse fuera de la restricción de red. Se conservaron logs de intentos iniciales y resultados finales.
 
-## Límites y bloqueo de inspección privada
+## Inspección privada e historial de autorización
 
 Se confirmó acceso de lectura a GitHub fuera de la restricción de red. La primera consulta dentro del sandbox había indicado un token inválido; la consulta autorizada posterior confirmó que la sesión era válida, por lo que no se cambió ninguna credencial.
 
 La rama `main` remota apunta a `f9fd7a01b6940db0257862a4e1ff0e0aa69133ee` y su workflow únicamente despliega: no tiene modo inspect. No se ejecutó. La rama remota de trabajo coincide con el commit local; se verificó que el workflow y el script inspector fueran idénticos a los revisados localmente.
 
-Después se solicitó ejecutar únicamente el workflow de esa rama con `tool=all`, `mode=inspect`, `activate_consumer=false`. La revisión automática de permisos rechazó la ejecución porque usaría secretos del repositorio y acceso a Railway sin autorización explícita del usuario para ese workflow. No se lanzó ningún workflow ni se intentó un mecanismo alternativo para eludir el rechazo.
+La primera solicitud de inspección fue rechazada por requerir autorización explícita. El usuario la concedió después y se ejecutó la inspección; luego autorizó el despliegue y la QA marcada. Esta barrera de autorización ya está resuelta.
 
-Quedan pendientes por ese bloqueo la lectura privada de variables, la verificación directa de credencial, la comparación de prefijos reales de secretos y la inspección de volúmenes. Su autorización no resolvería por sí sola las pruebas de login real, reinicio ni fallos operativos.
+Las lecturas privadas de variables, key y volúmenes, y la comparación de prefijos reales ya se realizaron. El 20 se confirmó además SUCCESS y se leyeron logs sanitizados por el acceso de CI existente. No se necesita acceso personal del usuario a Railway. Sigue pendiente completar Logto y los ensayos finales descritos en la revisión vigente.
 
 ## Checklist de cierre restante
 
-- [x] Resolver los nombres de variables Logto en el código de las tools, validado localmente; falta aplicar la versión en Railway.
-- [x] Adaptar las comprobaciones de despliegue para exigir SSO en producción, validado localmente y publicado en nuestro fork; falta aplicar el workflow actualizado.
-- [x] Preparar secretos independientes de sesión y credenciales de máquina en archivos locales ignorados, sin reemplazar ni enviar secretos existentes.
-- [ ] Inspeccionar la configuración privada y el volumen de ambas tools con autorización para el workflow de lectura.
+- [x] Resolver los nombres Logto y desplegar la versión con SSO obligatorio.
+- [x] Adaptar las comprobaciones de despliegue para exigir SSO, probadas y aplicadas.
+- [x] Configurar secretos independientes de sesión y credenciales de máquina, sin rotar los existentes.
+- [x] Inspeccionar la configuración privada y el volumen de ambas tools mediante el workflow autorizado.
 - [ ] Confirmar callback, logout, roles y cuentas de prueba con plataforma.
-- [ ] Validar login real, 401 JSON sin sesión, deep links y denegación por rol insuficiente en producción.
+- [x] Validar 401 JSON sin sesión en producción.
+- [ ] Completar login real, retorno del deep link y denegación por rol insuficiente con cuentas reales.
 - [ ] Alinear owner y requiredRoles del registro central con la decisión de plataforma.
-- [ ] Completar el escaneo de bundles con prefijos reales de API key y secreto Logto sin imprimirlos.
-- [ ] Confirmar el volumen persistente y probar reinicio real sin duplicar datos ni publicaciones.
-- [ ] Probar una entrada nueva marcada QA con el consumidor desplegado y verificar su salida exacta.
-- [ ] Probar una interrupción controlada y la recuperación sin pérdidas.
-- [ ] Validar un cierre ERP real, meta aprobada cuando corresponda y contexto real de proyecto.
+- [x] Completar el escaneo de bundles con prefijos reales disponibles sin imprimirlos.
+- [x] Confirmar el volumen persistente y conservar datos y publicaciones durante el reemplazo real de contenedores.
+- [x] Probar entradas QA marcadas y verificar las salidas exactas de los consumidores desplegados.
+- [x] Probar con procesos aislados core inaccesible, cambio/restauración de URL, backoff y recuperación sin pérdidas.
+- [ ] Completar los casos literales pendientes de 11.1/11.2 en los servicios del líder, con una ventana revisada y restauración.
+- [ ] Como aceptación empresarial adicional, validar cierre ERP real, meta aprobada y proyecto real; no son requisitos para la QA simulada permitida por el documento.
 - [ ] Actualizar la evidencia y declarar aceptación únicamente cuando estén resueltos incumplimientos y pendientes.
 
-**Veredicto:** no cerrar el runbook todavía. Hay cobertura local amplia y evidencia QA desplegada, pero la autenticación productiva no cumple y la aceptación operacional y empresarial sigue pendiente.
+**Veredicto actualizado:** no cerrar todo el runbook todavía. SSO obligatorio, secretos, volumen, estado de despliegue, logs y QA tienen evidencia. Logto sigue rechazando callbacks; quedan pruebas humanas, registro central y ensayos finales desplegados. La aceptación empresarial adicional está separada del cumplimiento técnico del documento.

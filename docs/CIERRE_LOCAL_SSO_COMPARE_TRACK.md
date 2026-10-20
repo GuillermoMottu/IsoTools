@@ -2,6 +2,8 @@
 
 Fecha: 19 de octubre de 2026. Última comprobación de estado: 21:57 UTC (15:57 de Ciudad de México).
 
+Actualización del 20: la [revisión completa del runbook](REVISION_CHECKLIST_RUNBOOK_2026-10-20.md) es el estado vigente. Se confirmaron deployments SUCCESS y logs por CI, se ejecutó la resiliencia con procesos reales y se preparó la [entrega al líder](ENTREGA_LIDER_RUNBOOK_2026-10-20.md). Los datos ERP reales y las metas aprobadas se separan como aceptación empresarial adicional; el documento permite QA simulada. La prueba literal de URL inválida afecta a la tool, no exige apagar el core.
+
 **Nuestras dos tools ya están desplegadas con SSO obligatorio y la QA marcada pasó. El login humano sigue bloqueado por la configuración de callbacks en Logto.** No se considera aceptado todo el runbook mientras ese bloqueo y las pruebas empresariales y operativas pendientes sigan abiertos.
 
 ## Cambios aplicados

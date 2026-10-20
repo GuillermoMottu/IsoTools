@@ -173,7 +173,7 @@ export function inspectRailwayOperations (toolId, service, json = railwayJson, r
           // Railway may flatten structured JSON fields into log attributes.
           entry = row.tool && row.action ? row : typeof row.message === 'string' ? JSON.parse(row.message) : row
         } catch { continue }
-        if (entry.tool !== toolId || !['poll', 'published', 'processed', 'discarded', 'retry', 'duplicate_input', 'duplicate_period'].includes(entry.action)) continue
+        if (!entry || typeof entry !== 'object' || entry.tool !== toolId || !['poll', 'published', 'processed', 'discarded', 'retry', 'duplicate_input', 'duplicate_period'].includes(entry.action)) continue
         actions.add(entry.action)
         const sample = { action: entry.action }
         for (const name of ['cursor', 'count', 'next_seq', 'input_seq', 'seq', 'retry_after_ms', 'http_status']) {
