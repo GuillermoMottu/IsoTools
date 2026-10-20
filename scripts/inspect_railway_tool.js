@@ -40,6 +40,9 @@ export function inspectConfiguration (variables, toolId, configuredHealthUrl = '
     redirect_uri_matches: variables.OIDC_REDIRECT_URI === `${TOOL_ORIGINS[toolId]}/auth/callback`,
     session_secret_configured: configured(variables, 'SESSION_SECRET'),
     tool_api_key_configured: configured(variables, 'TOOL_API_KEY'),
+    connector_credential_names_to_review: Object.keys(variables).filter(name => /^(CF_ACCESS_|MICROSIP_|ERP_(HOST|URL|USER|PASSWORD|PASS|TOKEN|API_KEY|CONNECTION|DATABASE))/.test(name) && configured(variables, name)),
+    roles_scope_configured: (variables.OIDC_SCOPES || 'openid profile email roles').split(/\s+/).includes('roles'),
+    post_logout_redirect_uri_matches: variables.OIDC_POST_LOGOUT_REDIRECT_URI?.trim().replace(/\/$/, '') === 'https://api-events.orcalabs.mx',
     consumer_enabled: variables.TOOL_CONSUMER_ENABLED === 'true',
     volume_mounted_at_data: variables.RAILWAY_VOLUME_MOUNT_PATH === '/data' ? true : null,
     state_path_matches: !variables.TOOL_STATE_DIR || variables.TOOL_STATE_DIR === '/data',
@@ -137,8 +140,47 @@ export function deploymentConfigurationReady (report) {
     report.state_directory_persistent === true && Boolean(report.health_url)
 }
 
+export function railwayText (args, input) {
+  return execFileSync('railway', args, { input, encoding: 'utf8', stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 })
+}
+
 export function railwayJson (args, input) {
-  return JSON.parse(execFileSync('railway', args, { input, encoding: 'utf8', stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 }))
+  return JSON.parse(railwayText(args, input))
+}
+
+export function inspectRailwayOperations (toolId, service, json = railwayJson, raw = railwayText) {
+  const report = { deployment_query_succeeded: false, latest_deployment_status: null, runtime_log_queries_succeeded: false, observed_log_actions: [], runtime_log_samples: [] }
+  try {
+    const deployments = json(['deployment', 'list', '--service', service, '--limit', '5', '--json'])
+    if (!Array.isArray(deployments)) throw new Error('invalid_deployment_list')
+    const latest = deployments[0]
+    const statuses = ['SUCCESS', 'FAILED', 'CRASHED', 'BUILDING', 'DEPLOYING', 'REMOVED', 'QUEUED', 'SKIPPED', 'WAITING', 'INITIALIZING', 'NEEDS_APPROVAL', 'SLEEPING']
+    report.deployment_query_succeeded = true
+    report.latest_deployment_status = statuses.includes(latest?.status) ? latest.status : null
+    if (/^[a-f0-9-]{36}$/i.test(latest?.id || '')) report.latest_deployment_id = latest.id
+  } catch { /* Raw CLI errors may contain credentials. Keep the failed query explicit. */ }
+  const actions = new Set()
+  try {
+    for (const filter of [null, 'published OR processed OR discarded OR retry']) {
+      const output = raw(['logs', '--service', service, '--lines', '100', '--json', ...(filter ? ['--filter', filter] : [])])
+      for (const line of output.split(/\r?\n/)) {
+        let row, entry
+        try { row = JSON.parse(line); entry = typeof row.message === 'string' ? JSON.parse(row.message) : row } catch { continue }
+        if (entry.tool !== toolId || !['poll', 'published', 'processed', 'discarded', 'retry', 'duplicate_input', 'duplicate_period'].includes(entry.action)) continue
+        actions.add(entry.action)
+        const sample = { action: entry.action }
+        for (const name of ['cursor', 'count', 'next_seq', 'input_seq', 'seq', 'retry_after_ms', 'http_status']) {
+          if (Number.isSafeInteger(entry[name]) && entry[name] >= 0) sample[name] = entry[name]
+        }
+        if (typeof row.timestamp === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(row.timestamp) && Number.isFinite(Date.parse(row.timestamp))) sample.timestamp = new Date(row.timestamp).toISOString()
+        report.runtime_log_samples.push(sample)
+      }
+    }
+    report.runtime_log_queries_succeeded = true
+  } catch { /* A log permission or CLI failure is not proof of healthy operation. */ }
+  report.observed_log_actions = [...actions].sort()
+  report.runtime_log_samples = report.runtime_log_samples.slice(-12)
+  return report
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -157,6 +199,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       report.state_directory_persistent = stateDirectoryIsPersistent(volumeList, process.env.RAILWAY_SERVICE, variables.TOOL_STATE_DIR || '/data')
       report.volume_query_succeeded = true
     } catch { report.volume_query_succeeded = false }
+    Object.assign(report, inspectRailwayOperations(process.env.TOOL_PAGE_ID, process.env.RAILWAY_SERVICE))
     console.log(JSON.stringify(report, null, 2))
     if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### ${report.tool}\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`)
     if (report.health_url && process.env.GITHUB_ENV) await appendFile(process.env.GITHUB_ENV, `HEALTH_URL=${report.health_url}\n`)

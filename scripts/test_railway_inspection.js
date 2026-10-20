@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { inspectConfiguration, inspectConnection, hasDataVolume, inspectFrontendBundle } from './inspect_railway_tool.js'
+import { inspectConfiguration, inspectConnection, hasDataVolume, inspectFrontendBundle, inspectRailwayOperations } from './inspect_railway_tool.js'
 
 const vars = { ISOTOOLS_API_URL: 'https://api-events.orcalabs.mx/api/v1', ISOTOOLS_API_KEY: 'secret-fixture-not-for-logs', RAILWAY_PUBLIC_DOMAIN: 'fixture.up.railway.app', RAILWAY_VOLUME_MOUNT_PATH: '/data', SESSION_SECRET: 'another-session-secret-fixture-at-least-32-characters', ISSUER_ENDPOINT: 'https://idp.fixture.invalid/oidc', APP_ID: 'fixture-client', APP_SECRETS: 'logto-secret-fixture-not-for-logs', OIDC_REDIRECT_URI: 'https://cpa.orcalabs.mx/auth/callback' }
 const calls = []
@@ -78,3 +78,32 @@ for (const secret of ['APP_SECRETS', 'SESSION_SECRET', 'OIDC_CLIENT_SECRET']) {
 const sealedClient = await inspectFrontendBundle({ ...vars, OIDC_CLIENT_SECRET: null }, 'https://cpa.orcalabs.mx/health', async url => url.endsWith('/assets/app.js') ? new Response('safe') : new Response('<script src="/assets/app.js"></script>', { headers: { 'content-type': 'text/html' } }))
 assert.equal(sealedClient.frontend_actual_client_secret_checked, false, 'a readable inactive alias cannot certify a sealed active secret')
 console.log('Railway inspection: SSO 401, protected-shell manifests and Logto/session secret scanning PASS')
+const connectorVars = { ...vars, CF_ACCESS_CLIENT_SECRET: null, ERP_PASSWORD: 'private-fixture-credential', ERP_API_KEY: '', OIDC_SCOPES: 'openid roles', OIDC_POST_LOGOUT_REDIRECT_URI: 'https://api-events.orcalabs.mx' }
+const connectorReport = inspectConfiguration(connectorVars, 'compare_planned_vs_actual')
+assert.deepEqual(connectorReport.connector_credential_names_to_review, ['CF_ACCESS_CLIENT_SECRET', 'ERP_PASSWORD'])
+assert.equal(connectorReport.roles_scope_configured, true)
+assert.equal(connectorReport.post_logout_redirect_uri_matches, true)
+assert.equal(JSON.stringify(connectorReport).includes(connectorVars.ERP_PASSWORD), false)
+const operationCalls = []
+const ops = inspectRailwayOperations('compare_planned_vs_actual', 'compare-planned-vs-actual', args => {
+  operationCalls.push(args)
+  return [{ id: '6bf4dda7-06a8-48f4-a217-668e63cc861d', status: 'SUCCESS', meta: { private: 'never-print-fixture-secret' } }]
+}, args => {
+  operationCalls.push(args)
+  return [
+    JSON.stringify({ timestamp: '2026-10-20T12:00:00Z', message: JSON.stringify({ tool: 'compare_planned_vs_actual', action: 'poll', cursor: 7, count: 1, next_seq: 8, api_key: 'never-print-fixture-secret' }) }),
+    JSON.stringify({ message: JSON.stringify({ tool: 'compare_planned_vs_actual', action: 'published', input_seq: 8, http_status: 201, event_id: 'never-print-fixture-secret' }) }),
+    JSON.stringify({ message: JSON.stringify({ tool: 'other_tool', action: 'retry' }) }),
+    'unstructured private log never-print-fixture-secret'
+  ].join('\n')
+})
+assert.equal(ops.latest_deployment_status, 'SUCCESS')
+assert.equal(ops.runtime_log_queries_succeeded, true)
+assert.deepEqual(ops.observed_log_actions, ['poll', 'published'])
+assert.equal(JSON.stringify(ops).includes('never-print-fixture-secret'), false)
+assert.ok(operationCalls.every(args => ['deployment', 'logs'].includes(args[0]) && !args.includes('redeploy') && !args.includes('set')))
+const failedOps = inspectRailwayOperations('compare_planned_vs_actual', 'compare-planned-vs-actual', () => { throw new Error('private-fixture-secret') }, () => { throw new Error('private-fixture-secret') })
+assert.equal(failedOps.deployment_query_succeeded, false)
+assert.equal(failedOps.runtime_log_queries_succeeded, false)
+assert.equal(JSON.stringify(failedOps).includes('private-fixture-secret'), false)
+console.log('Railway operations: read-only deployment/log queries, credential-name checks and whitelisted reports PASS')
