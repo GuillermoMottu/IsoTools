@@ -161,7 +161,7 @@ export function inspectRailwayOperations (toolId, service, json = railwayJson, r
   } catch { /* Raw CLI errors may contain credentials. Keep the failed query explicit. */ }
   const actions = new Set()
   try {
-    for (const filter of [null, 'published OR processed OR discarded OR retry']) {
+    for (const filter of [null, '@action:published OR @action:processed OR @action:discarded OR @action:retry OR published OR processed OR discarded OR retry']) {
       const output = raw(['logs', '--service', service, '--lines', '100', '--json', ...(filter ? ['--filter', filter] : [])])
       for (const line of output.split(/\r?\n/)) {
         if (!line.trim()) continue
