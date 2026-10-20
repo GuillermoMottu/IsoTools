@@ -149,7 +149,7 @@ export function railwayJson (args, input) {
 }
 
 export function inspectRailwayOperations (toolId, service, json = railwayJson, raw = railwayText) {
-  const report = { deployment_query_succeeded: false, latest_deployment_status: null, runtime_log_queries_succeeded: false, observed_log_actions: [], runtime_log_samples: [] }
+  const report = { deployment_query_succeeded: false, latest_deployment_status: null, runtime_log_queries_succeeded: false, runtime_log_lines_read: 0, runtime_json_logs_read: 0, observed_log_actions: [], runtime_log_samples: [] }
   try {
     const deployments = json(['deployment', 'list', '--service', service, '--limit', '5', '--json'])
     if (!Array.isArray(deployments)) throw new Error('invalid_deployment_list')
@@ -164,8 +164,15 @@ export function inspectRailwayOperations (toolId, service, json = railwayJson, r
     for (const filter of [null, 'published OR processed OR discarded OR retry']) {
       const output = raw(['logs', '--service', service, '--lines', '100', '--json', ...(filter ? ['--filter', filter] : [])])
       for (const line of output.split(/\r?\n/)) {
+        if (!line.trim()) continue
+        report.runtime_log_lines_read++
         let row, entry
-        try { row = JSON.parse(line); entry = typeof row.message === 'string' ? JSON.parse(row.message) : row } catch { continue }
+        try {
+          row = JSON.parse(line)
+          report.runtime_json_logs_read++
+          // Railway may flatten structured JSON fields into log attributes.
+          entry = row.tool && row.action ? row : typeof row.message === 'string' ? JSON.parse(row.message) : row
+        } catch { continue }
         if (entry.tool !== toolId || !['poll', 'published', 'processed', 'discarded', 'retry', 'duplicate_input', 'duplicate_period'].includes(entry.action)) continue
         actions.add(entry.action)
         const sample = { action: entry.action }
