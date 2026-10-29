@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { TOOL_CONTRACTS, subscriptionEvent, consumerInput, evaluateConsumerInput } from '../src/services/toolConsumer.js'
 
 const CENTRAL_API = 'https://api-events.orcalabs.mx/api/v1'
-const testInput = row => row.metadata?.test === true || row.data?.test === true || row.data?._placeholder === true || (row.module_id || row.module?.id) === 'qa_runbook'
 const sourceId = row => row.module_id || row.module?.id || row.tool
+const testInput = row => row.metadata?.test === true || row.data?.test === true || row.data?._placeholder === true || sourceId(row) === 'qa_runbook' || row.correlation_id?.startsWith('qa-runbook-') === true
 const outputType = row => row.event_type || row.event?.type || row.event
 const fieldsFor = result => ({ status: result.status, missing_fields: result.data_quality?.missing_fields || [], warnings: result.data_quality?.warnings || [] })
 
@@ -21,7 +21,8 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
   }
   for (const [toolId, contract] of Object.entries(TOOL_CONTRACTS)) {
     if (selectedTool !== 'all' && selectedTool !== toolId) continue
-    let cursor = 0, latest = null, total = 0, tests = 0, complete = false
+    let cursor = 0, total = 0, tests = 0, complete = false
+    const candidates = []
     for (let page = 0; page < 100; page++) {
       const batch = await get(`/events/subscriptions/${toolId}?since_seq=${cursor}&limit=1000`)
       if (batch.consumer !== toolId || !batch.consumes?.includes(contract.consumes) || !Array.isArray(batch.events)) throw new Error('invalid_subscription_response')
@@ -32,7 +33,7 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
         previous = seq
         total++
         if (testInput(row)) tests++
-        else latest = row
+        else candidates.push(row)
       }
       const next = Number(batch.next_seq)
       if (!Number.isSafeInteger(next) || next < previous) throw new Error('invalid_subscription_cursor')
@@ -43,12 +44,24 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
     const item = { tool: toolId, consumes: contract.consumes, inventory_count: total, marked_test_count: tests, inventory_complete: complete }
     report.tools.push(item)
     if (!complete) throw new Error('inventory_page_limit_reached')
+    let latest = null, chain = null
+    item.excluded_qa_lineage_count = 0
+    const chains = new Map()
+    while (candidates.length) {
+      const candidate = candidates.pop()
+      const id = candidate.correlation_id || candidate.event_id
+      if (typeof id !== 'string' || !id || /^[.]+$/.test(id) || /[\r\n\0]/.test(id)) throw new Error('invalid_correlation_id')
+      if (!chains.has(id)) chains.set(id, await get(`/events/chain/${encodeURIComponent(id)}`))
+      const candidateChain = chains.get(id)
+      if (!Array.isArray(candidateChain.events)) throw new Error('invalid_chain_response')
+      if (candidateChain.events.some(testInput)) { item.excluded_qa_lineage_count++; continue }
+      latest = candidate
+      chain = candidateChain
+      break
+    }
     if (!latest) { item.status = 'no_non_test_input'; continue }
     const event = subscriptionEvent(latest, contract.consumes)
     const correlationId = event.correlation_id || event.event_id
-    if (typeof correlationId !== 'string' || !correlationId || /^[.]+$/.test(correlationId) || /[\r\n\0]/.test(correlationId)) throw new Error('invalid_correlation_id')
-    const chain = await get(`/events/chain/${encodeURIComponent(correlationId)}`)
-    if (!Array.isArray(chain.events)) throw new Error('invalid_chain_response')
     const historical = chain.events.filter(row => sourceId(row) === toolId && outputType(row) === contract.produces && row.causation_id === event.event_id)
     const config = { ...businessConfig, ...(organizationId ? { organization_id: organizationId } : {}) }
     const input = consumerInput(toolId, event, config)

@@ -28,7 +28,7 @@ El identificador real de organización queda pendiente por indicación del usuar
 
 En el workflow **Deploy ORCA tools to Railway**, seleccionar la rama que contiene esta implementación y `mode=replay`, con `tool=all` o la tool concreta. Este modo no ejecuta los jobs de despliegue ni el job `validate` que publica entradas QA.
 
-El script `scripts/replay_tools_readonly.js` solo hace GET de suscripciones y cadenas. Lee desde `since_seq=0` con paginación, usando variables en memoria; no importa `createToolConsumer`, no abre archivos de estado ni llama a su tick. Selecciona la última entrada sin marcas de prueba de cada tool e identifica su procedencia ERP cuando está presente en la cadena. Una entrada sin marca no se declara automáticamente de negocio real.
+El script `scripts/replay_tools_readonly.js` solo hace GET de suscripciones y cadenas. Lee desde `since_seq=0` con paginación, usando variables en memoria; no importa `createToolConsumer`, no abre archivos de estado ni llama a su tick. Selecciona la última entrada sin marcas de prueba de cada tool e identifica su procedencia ERP cuando está presente en la cadena. También excluye correlaciones conocidas de QA y descendientes cuya cadena contiene un origen QA, aunque hayan perdido metadata.test. Una entrada sin marca no se declara automáticamente de negocio real.
 
 El informe registra cantidades, IDs, hash de entrada, versiones de cálculo/regla, campos faltantes y comparación de status. No imprime eventos crudos, importes de negocio, configuración o credenciales. Cuenta únicamente las salidas de la tool cuyo causation_id coincide con la entrada seleccionada; otra salida de la misma cadena no sustituye esa evidencia.
 

@@ -7,7 +7,7 @@ const sales = { seq: 1, event_id: ids.sales, correlation_id: ids.chain, timestam
 const kpi = { ...sales, seq: 3, event_id: ids.kpi, module_id: 'generate_kpis', event_type: 'KPI_REPORT_GENERATED', data: { plantId: 'plant_01', period: 'monthly', kpis: { oee: 0.78 } } }
 const fullKpi = { ...kpi, data: { ...kpi.data, organization_id: 'fixture-org', project_id: 'fixture-project', project_name: 'Fixture project', as_of_date: '2026-10-21', planned_start_date: '2026-10-01', planned_end_date: '2026-12-31', planned_progress_percent: 40, actual_progress_percent: 34 } }
 let requests = 0
-function fetcher ({ fullContext = false, empty = false, duplicate = false, paginated = false } = {}) {
+function fetcher ({ fullContext = false, empty = false, duplicate = false, paginated = false, qaAncestor = false, qaCorrelation = false } = {}) {
   return async (url, options) => {
     requests++
     assert.equal(options.method, 'GET', 'the central API must never receive a write')
@@ -24,13 +24,15 @@ function fetcher ({ fullContext = false, empty = false, duplicate = false, pagin
       if (paginated && isSales && cursor === 0) {
         return Response.json({ consumer, consumes, events: Array.from({ length: 1000 }, (_, i) => ({ ...sales, seq: i + 1, metadata: { test: true } })), next_seq: 1000 })
       }
-      const input = isSales ? { ...sales, seq: paginated ? 1001 : 1 } : (fullContext ? fullKpi : kpi)
+      const input = isSales ? { ...sales, seq: paginated ? 1001 : 1 } : structuredClone(fullContext ? fullKpi : kpi)
+      if (qaCorrelation) input.correlation_id = 'qa-runbook-known-test-lineage'
       const qa = { ...input, seq: Number(input.seq) + 1, event_id: 'qa-must-not-be-selected', metadata: { test: true } }
       return Response.json({ consumer, consumes, events: [input, qa], next_seq: qa.seq })
     }
     assert.equal(parsed.pathname, `/api/v1/events/chain/${encodeURIComponent(ids.chain)}`)
     const exact = { event_id: 'stored-sales-output', tool: 'compare_planned_vs_actual', event: 'PRODUCTION_VARIANCE_DETECTED', causation_id: ids.sales, data: { status: 'sin_meta' } }
     return Response.json({ events: [
+      ...(qaAncestor ? [{ tool: 'qa_runbook', event: 'TEST_ROOT' }] : []),
       { tool: 'erp_connector', event: sales.event_type, event_id: ids.sales }, exact,
       ...(duplicate ? [{ ...exact, event_id: 'duplicate-output' }] : []),
       { ...exact, event_id: 'unrelated-same-chain', causation_id: 'other-input' },
@@ -68,6 +70,10 @@ const empty = await replayToolsReadonly({ apiKey: key, fetcher: fetcher({ empty:
 assert.ok(empty.tools.every(tool => tool.status === 'no_non_test_input'))
 const selected = await replayToolsReadonly({ apiKey: key, selectedTool: 'track_project_progress', fetcher: fetcher() })
 assert.deepEqual(selected.tools.map(tool => tool.tool), ['track_project_progress'])
+const qaLineage = await replayToolsReadonly({ apiKey: key, fetcher: fetcher({ qaAncestor: true }) })
+assert.ok(qaLineage.tools.every(tool => tool.status === 'no_non_test_input' && tool.excluded_qa_lineage_count === 1), 'descendants of QA roots are excluded even if they lose metadata.test')
+const qaCorrelation = await replayToolsReadonly({ apiKey: key, fetcher: fetcher({ qaCorrelation: true }) })
+assert.ok(qaCorrelation.tools.every(tool => tool.status === 'no_non_test_input'), 'known QA correlations are not business evidence')
 await assert.rejects(replayToolsReadonly({ apiKey: key, selectedTool: 'other-tool' }), /invalid_tool/)
 await assert.rejects(replayToolsReadonly({ apiKey: key, fetcher: async () => Response.json({}, { status: 401 }) }), /central_http_401/)
 await assert.rejects(replayToolsReadonly({ apiKey: '', fetcher: async () => assert.fail('no request without key') }), /missing_central_key/)
