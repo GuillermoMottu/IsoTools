@@ -24,6 +24,23 @@ Esto no acredita una sesión humana completa ni roles/logout reales. No se usaro
 
 El identificador real de organización queda pendiente por indicación del usuario. No se utiliza `ORG-001` ni otra identidad de demostración para completar datos reales. No se configuraron metas en producción.
 
+## Resultado del replay del 29 de octubre
+
+El [replay definitivo 40833405930](https://github.com/GuillermoMottu/IsoTools/actions/runs/40833405930), desde `73a7018`, terminó correctamente. Solo se ejecutó el job de replay; los dos despliegues y la publicación QA quedaron skipped. Las pruebas de sus límites y su ejecución corrieron en Node 22 en Actions.
+
+| Tool | Inventario leído | Resultado |
+| --- | --- | --- |
+| CPA | 4 ERP_SALES_PERIOD_CLOSED; los 4 identificados como prueba | No hay entrada real disponible para completar PV-7.1/7.2. No se fabricó otro cierre. |
+| TPP | 15 KPI_REPORT_GENERATED; 11 identificados como prueba por marca o correlación | La última entrada restante seleccionada es seq=53, no tiene procedencia ERP comprobada en su cadena y devuelve not_calculable por ocho campos faltantes. No se convirtió en evidencia real. |
+
+La entrada de TPP seleccionada tiene event_id `fe8eb46b-50c4-4877-b0ba-7db99503442b` y correlation_id `f140073c-d6a8-49cd-bc4c-5a89d37e0395`. No contiene organization_id, project_id, project_name, as_of_date, planned_start_date, planned_end_date, planned_progress_percent ni actual_progress_percent. No se encontró salida propia con causation_id igual a esa entrada. Estos resultados no acreditan un proyecto de negocio ni una cadena ERP completa.
+
+La primera ejecución, 40832924093, detectó que algunos descendientes QA habían perdido metadata.test. Se corrigió la exclusión por correlación y por ancestros QA y se añadieron regresiones antes del replay definitivo. La primera selección queda sustituida por los resultados anteriores.
+
+Después del replay se releyó el estado autenticado de ambos servicios: los cursores siguen en 7679 y 7684, los registros en 2 y 3, las últimas publicaciones son las mismas y no hay publicación pendiente. No se publicaron entradas QA durante esta restauración y replay.
+
+Para impedir que una ejecución futura desde el main antiguo vuelva a reemplazar nuestros servicios por el core, está preparado el [PR borrador 2 del fork](https://github.com/GuillermoMottu/IsoTools/pull/2). Solo cambia el workflow de CPA/TPP; todavía no está fusionado. Hasta integrar la protección, se debe seleccionar expresamente nuestra rama de trabajo en Run workflow.
+
 ## Cómo ejecutar el replay
 
 En el workflow **Deploy ORCA tools to Railway**, seleccionar la rama que contiene esta implementación y `mode=replay`, con `tool=all` o la tool concreta. Este modo no ejecuta los jobs de despliegue ni el job `validate` que publica entradas QA.
