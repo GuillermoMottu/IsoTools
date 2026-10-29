@@ -64,6 +64,28 @@ export function salesInput (event, config = {}) {
   }
 }
 
+export function consumerInput (toolId, event, config = {}) {
+  if (!TOOL_CONTRACTS[toolId]) throw new Error('unknown_tool')
+  return toolId === 'compare_planned_vs_actual' ? salesInput(event, config) : { ...event.data, ...projectFields(event.data), source: event.data.source || { source_system: event.module?.id || event.module_id || 'Bus de KPIs', source_extracted_at: event.timestamp, source_record_ids: [event.event_id] }, ...(event.metadata?.test ? { test: true } : {}) }
+}
+
+// Shared by the live consumer and the isolated replay; evaluation has no I/O.
+export function evaluateConsumerInput (toolId, event, input) {
+  const result = TOOL_CONTRACTS[toolId].evaluate({ ...event, data: input })
+  // ERP_CENTRAL: preserve the actual even when no approved sales target exists.
+  if (toolId !== 'compare_planned_vs_actual' || Array.isArray(event.data.metrics) || input.metrics[0].planned !== null) return result
+  return {
+    ...result, module: 'sales', status: 'sin_meta',
+    summary: 'Ventas reales recibidas; no hay meta aprobada para comparar.',
+    deviation_percent: null, deviationPercent: null, weighted_deviation_percent: null,
+    details: {
+      planned: null, actual: input.metrics[0].actual, unit: event.data.unit,
+      metrics: [{ ...input.metrics[0], status: 'sin_meta', variance: null, variance_percent: null, adverse_percent: null }]
+    },
+    recommended_actions: ['define_sales_target']
+  }
+}
+
 export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, businessConfigFile, initialCursor, fetcher = fetch, logger = entry => console.log(JSON.stringify({ tool: toolId, ...entry })) }) {
   const contract = TOOL_CONTRACTS[toolId]
   if (!contract) throw new Error('unknown_tool')
@@ -151,7 +173,7 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
         let event, input
         try {
           event = subscriptionEvent(row, contract.consumes)
-          input = toolId === 'compare_planned_vs_actual' ? salesInput(event, config) : { ...event.data, ...projectFields(event.data), source: event.data.source || { source_system: event.module?.id || row.module_id || 'Bus de KPIs', source_extracted_at: event.timestamp, source_record_ids: [event.event_id] }, ...(event.metadata?.test ? { test: true } : {}) }
+          input = consumerInput(toolId, event, config)
         } catch (error) {
           if (!['invalid_subscription_event', 'invalid_sales_period'].includes(error.message)) throw error
           await reject(row, error.message)
@@ -168,20 +190,7 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
           logger({ action: 'duplicate_period', event_id: event.event_id, seq: state.cursor })
           continue
         }
-        let result = contract.evaluate({ ...event, data: input })
-        // ERP_CENTRAL: an absent sales target must publish the actual, not stall the subscription.
-        if (toolId === 'compare_planned_vs_actual' && !Array.isArray(event.data.metrics) && input.metrics[0].planned === null) {
-          result = {
-            ...result, module: 'sales', status: 'sin_meta',
-            summary: 'Ventas reales recibidas; no hay meta aprobada para comparar.',
-            deviation_percent: null, deviationPercent: null, weighted_deviation_percent: null,
-            details: {
-              planned: null, actual: input.metrics[0].actual, unit: event.data.unit,
-              metrics: [{ ...input.metrics[0], status: 'sin_meta', variance: null, variance_percent: null, adverse_percent: null }]
-            },
-            recommended_actions: ['define_sales_target']
-          }
-        }
+        const result = evaluateConsumerInput(toolId, event, input)
         const id = input.analysis_id || input.analysisId || input.project_id || input.projectId
         if (id) state.records = { ...state.records, [id]: { ...input, [toolId === 'compare_planned_vs_actual' ? 'analysis_id' : 'project_id']: id } }
         state.last_evaluation = { event_id: event.event_id, result }

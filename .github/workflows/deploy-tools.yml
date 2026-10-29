@@ -15,7 +15,7 @@ on:
           - compare_planned_vs_actual
           - track_project_progress
       mode:
-        description: Inspect configuration or deploy
+        description: Inspect, deploy, publish marked QA or replay existing inputs read-only
         required: true
         default: inspect
         type: choice
@@ -23,6 +23,7 @@ on:
           - inspect
           - deploy
           - validate
+          - replay
       activate_consumer:
         description: Activate registered consumers for new events (no historical replay)
         type: boolean
@@ -37,7 +38,7 @@ jobs:
     name: deploy compare_planned_vs_actual
     runs-on: ubuntu-latest
 
-    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.mode != 'validate' && (inputs.tool == 'all' || inputs.tool == 'compare_planned_vs_actual')) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || ((inputs.mode == 'inspect' || inputs.mode == 'deploy') && (inputs.tool == 'all' || inputs.tool == 'compare_planned_vs_actual')) }}
 
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_COMPARE_TOKEN || secrets.RAILWAY_TOKEN }}
@@ -125,7 +126,7 @@ jobs:
     name: deploy track_project_progress
     runs-on: ubuntu-latest
 
-    if: ${{ github.event_name != 'workflow_dispatch' || (inputs.mode != 'validate' && (inputs.tool == 'all' || inputs.tool == 'track_project_progress')) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || ((inputs.mode == 'inspect' || inputs.mode == 'deploy') && (inputs.tool == 'all' || inputs.tool == 'track_project_progress')) }}
 
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TRACK_TOKEN || secrets.RAILWAY_TOKEN }}
@@ -230,3 +231,25 @@ jobs:
           COMPARE_TOOL_API_KEY: ${{ secrets.COMPARE_TOOL_API_KEY }}
           TRACK_TOOL_API_KEY: ${{ secrets.TRACK_TOOL_API_KEY }}
         run: node scripts/verify_runbook_bus.js
+
+  replay_readonly:
+    name: Replay existing CPA and TPP inputs without publishing
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'replay' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install tool dependencies
+        run: |
+          corepack enable
+          pnpm install --prod --frozen-lockfile
+      - name: Test read-only replay boundaries
+        run: node scripts/test_readonly_replay.js
+      - name: Read existing inputs and compare historical outputs
+        env:
+          ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
+          REPLAY_ORGANIZATION_ID: ${{ vars.ISOTOOLS_ORGANIZATION_ID || '' }}
+          TOOL_SELECTED: ${{ inputs.tool }}
+        run: node scripts/replay_tools_readonly.js
