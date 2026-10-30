@@ -41,6 +41,16 @@ Después del replay se releyó el estado autenticado de ambos servicios: los cur
 
 Para impedir que una ejecución futura desde el main antiguo vuelva a reemplazar nuestros servicios por el core, está preparado el [PR borrador 2 del fork](https://github.com/GuillermoMottu/IsoTools/pull/2). Solo cambia el workflow de CPA/TPP; todavía no está fusionado. Hasta integrar la protección, se debe seleccionar expresamente nuestra rama de trabajo en Run workflow.
 
+## Continuación de los pendientes
+
+La [reconsulta 40977402839](https://github.com/GuillermoMottu/IsoTools/actions/runs/40977402839) conserva el resultado anterior: cuatro cierres CPA, todos QA, y quince entradas KPI, once identificadas como prueba. La entrada TPP seleccionada continúa en seq=53 con los ocho campos obligatorios ausentes. No hay evidencia nueva para aprobar el escenario real.
+
+La [inspección 40978055458](https://github.com/GuillermoMottu/IsoTools/actions/runs/40978055458) volvió a confirmar consumidores habilitados, key central válida, identidad correcta y SSO en ambos servicios. Además consultó la configuración de Railway sin descifrar variables: ninguno de nuestros dos servicios tiene fuente GitHub conectada. La consulta usa la API GraphQL oficial únicamente con una operación query; no cambia la configuración del proveedor.
+
+El PR preventivo #2 quedó reducido a un diff de 16 adiciones, con checks aprobados sobre `55cf5c2f1c8143cd4c8f7fb288ec21f91676d892`. La fusión no se realizó: requiere autorización explícita para integrar en main. Ese push también puede disparar el workflow del core del fork, ajeno al alcance de nuestras tools; se preparó una fusión de mantenimiento con los workflows automáticos omitidos solo en ese commit. No se deshabilitaron workflows ni se cambió main durante esta continuación.
+
+Se abrió el login real de CPA y se llegó a la pantalla de acceso de Logto. Completar la sesión humana requiere que el usuario inicie sesión; no se ingresaron credenciales ni se fabricaron cookies. Roles, retorno al deep link, sesión en TPP y logout permanecen pendientes hasta contar con esa sesión.
+
 ## Cómo ejecutar el replay
 
 En el workflow **Deploy ORCA tools to Railway**, seleccionar la rama que contiene esta implementación y `mode=replay`, con `tool=all` o la tool concreta. Este modo no ejecuta los jobs de despliegue ni el job `validate` que publica entradas QA.
@@ -56,6 +66,8 @@ node scripts/replay_tools_readonly.js
 ```
 
 Variables opcionales: `TOOL_SELECTED` (all o una de nuestras dos tools), `REPLAY_ORGANIZATION_ID` (solo cuando esté acordado), y `TOOL_REPLAY_CONFIG_FILE` (JSON privado con organization_id y sales_plans reales). En Actions, la organización opcional se toma de `ISOTOOLS_ORGANIZATION_ID`, variable del repositorio. No se crea ni rellena automáticamente.
+
+Actions ahora prefiere el secreto `ISOTOOLS_READONLY_API_KEY` para este job, y conserva `ISOTOOLS_API_KEY` como alternativa para las consultas GET existentes. El secreto dedicado todavía no existe en el fork. Plataforma debe emitir una key cuyo único scope sea `events:read`, y guardarla en ese secreto sin sustituir la key del consumidor productivo. El nombre del secreto por sí solo no certifica sus scopes: deben confirmarse en el registro de la key. No se creó una credencial en el core ni se rotaron secretos de nuestras tools.
 
 El evaluador y el consumidor comparten las mismas funciones puras de adaptación y cálculo. No se alteraron contratos ni reglas de negocio para habilitar el replay.
 

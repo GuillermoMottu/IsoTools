@@ -2,6 +2,8 @@
 
 Fecha: 20 de octubre de 2026. Este archivo no contiene secretos y no se envió automáticamente a otra persona.
 
+Actualización: este documento conserva la evidencia histórica del día 20. El cierre y los pendientes vigentes de nuestras dos tools están en [Ensayo de solo lectura CPA/TPP](ENSAYO_CPA_TPP_SOLO_LECTURA.md). Las callbacks ya alcanzan la pantalla de Logto y no deben seguir tratándose como rechazadas por el error observado el día 20; aún falta la prueba humana completa.
+
 Nuestras tools ya tienen SSO obligatorio, secretos propios, consumidor habilitado y volumen persistente. Los deployments consultados por CI están en SUCCESS. Faltan las acciones y pruebas de cierre siguientes.
 
 ## Logto
