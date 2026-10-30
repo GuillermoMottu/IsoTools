@@ -1,0 +1,55 @@
+{
+  "mode": "readonly_replay",
+  "central_methods": [
+    "GET"
+  ],
+  "production_state_accessed": false,
+  "checked_at": "2026-10-30T06:44:55.118Z",
+  "tools": [
+    {
+      "tool": "compare_planned_vs_actual",
+      "consumes": "ERP_SALES_PERIOD_CLOSED",
+      "inventory_count": 4,
+      "marked_test_count": 4,
+      "inventory_complete": true,
+      "excluded_qa_lineage_count": 0,
+      "status": "no_non_test_input"
+    },
+    {
+      "tool": "track_project_progress",
+      "consumes": "KPI_REPORT_GENERATED",
+      "inventory_count": 15,
+      "marked_test_count": 11,
+      "inventory_complete": true,
+      "excluded_qa_lineage_count": 0,
+      "status": "evaluated",
+      "input_seq": 53,
+      "input_event_id": "fe8eb46b-50c4-4877-b0ba-7db99503442b",
+      "correlation_id": "f140073c-d6a8-49cd-bc4c-5a89d37e0395",
+      "source_module": "generate_kpis",
+      "erp_origin_in_chain": false,
+      "input_sha256": "90205c5630c7b45c6becb354bf42ec183c4b635dd0849d1298ba756b8f0fb660",
+      "baseline": {
+        "status": "not_calculable",
+        "missing_fields": [
+          "organization_id",
+          "project_id",
+          "project_name",
+          "as_of_date",
+          "planned_start_date",
+          "planned_end_date",
+          "planned_progress_percent",
+          "actual_progress_percent"
+        ],
+        "warnings": []
+      },
+      "configured_context_is_test": false,
+      "historical_output_count": 0,
+      "historical_outputs": [],
+      "calculation_version": "1.0.0",
+      "rule_version": "1.0.0",
+      "historical_configuration_known": false,
+      "acceptance": "requires_review"
+    }
+  ]
+}

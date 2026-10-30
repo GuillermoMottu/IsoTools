@@ -2,6 +2,8 @@
 
 Fecha: 29 de octubre de 2026. Responsables: desarrolladores de las tools y líder del proyecto. La validación de desarrollo no requiere aprobación de usuarios de negocio ni esperar a que se encienda Microsip.
 
+Actualización del 30: [TPP integrado y desplegado, R2 e inventario actualizado](RESULTADO_CONTINUACION_2026-10-30.md). La solución por projectId ya se comprobó en el servicio real con un proyecto QA conservado; no queda pendiente su integración/despliegue. El acceso humano con roles sigue pendiente de Carlos/líder.
+
 Estado posterior al aplicar los instructivos: [cierre y acciones concretas](CIERRE_PENDIENTES_INSTRUCTIVOS_2026-10-29.md). El diagnóstico de configuración SSO y el GET central ya se verificaron remotamente; la resolución TPP por projectId está implementada y probada en el PR 3 del fork. El parche de metadatos del registro central está preparado para el líder.
 
 Revisión posterior de los instructivos originales: [pendientes frente a las guías](REVISION_INSTRUCCIONES_PENDIENTES_CPA_TPP.md). Corrige la atribución del contexto TPP al productor: los ocho campos son nuestro contrato extendido, todavía pendiente de alinear con el contrato original que recibe projectId. También identifica el registro central incompleto y la verificación de claim/mapeo aún no documentada.

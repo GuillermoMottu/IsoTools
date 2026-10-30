@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-10-30 06:23:46 UTC",
+  "verification": "real_CPA_session_after_user_sign_in_and_consent",
+  "tool": "compare_planned_vs_actual",
+  "auth_me": {
+    "authenticated": true,
+    "mode": "sso",
+    "roles": [],
+    "role": null
+  },
+  "analyses_response": {
+    "error": "insufficient_role",
+    "required": [
+      "OperationsManager",
+      "Auditor"
+    ]
+  },
+  "credentials_tokens_cookies_recorded": false,
+  "raw_id_token_claims_inspected": false,
+  "business_write_attempted": false,
+  "role_configuration_changed": false,
+  "conclusion": "Fresh sign-in did not restore mapped roles; Logto administrator review remains required."
+}

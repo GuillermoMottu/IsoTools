@@ -2,6 +2,8 @@
 
 Fecha local: 29 de octubre de 2026. Solo CPA/TPP. Desarrolladores y líder crean y validan en esta etapa.
 
+Actualización del 30: el [resultado de la continuación](RESULTADO_CONTINUACION_2026-10-30.md) sustituye los pendientes técnicos de integración/despliegue descritos abajo. El PR 3 ya se integró y TPP está desplegado y probado por projectId; se ejecutaron R2 de solo lectura, consulta parcial R1 y replay actualizado. Las secciones siguientes conservan el contexto del cierre inicial del día 29.
+
 ## Diagnóstico remoto resuelto
 
 Se publicó en nuestra rama del fork el diagnóstico sanitizado `59433c4` y se ejecutó [inspect 41007839950](https://github.com/GuillermoMottu/IsoTools/actions/runs/41007839950). Los pasos de preparación de variables, despliegue y publicación QA quedaron skipped; únicamente se leyeron servicios y configuración. El [informe guardado](evidencias/inspeccion_roles_41007839950.json) acredita, en ambas tools:

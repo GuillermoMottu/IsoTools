@@ -4,7 +4,7 @@ import { inspectConsumerBacklog, inspectErpConnectorStatus } from './inspect_rai
 const tool = 'compare_planned_vs_actual'
 const variables = { TOOL_API_KEY: 'fixture-tool-key-not-for-core', ISOTOOLS_API_KEY: 'fixture-core-key-not-for-tool' }
 const state = { cursor: 50, records: { fixture: { private: 'business-data-not-for-report' } }, rejected: {}, pending: null }
-for (const scenario of ['empty', 'pending', 'advancing', 'unauthorized', 'bad_order']) {
+for (const scenario of ['empty', 'pending', 'advancing', 'unauthorized', 'bad_order', 'bad_records']) {
   const calls = []
   let snapshots = 0
   const report = await inspectConsumerBacklog(variables, tool, async (url, options) => {
@@ -16,6 +16,7 @@ for (const scenario of ['empty', 'pending', 'advancing', 'unauthorized', 'bad_or
       assert.equal(parsed.pathname, '/api/tool/status')
       assert.equal(options.headers['x-api-key'], variables.TOOL_API_KEY)
       snapshots++
+      if (scenario === 'bad_records') return Response.json({ ...state, records: 'invalid' })
       return Response.json({ ...state, cursor: scenario === 'advancing' && snapshots === 2 ? 51 : 50 })
     }
     assert.equal(parsed.origin, 'https://api-events.orcalabs.mx')
@@ -25,7 +26,7 @@ for (const scenario of ['empty', 'pending', 'advancing', 'unauthorized', 'bad_or
     const events = scenario === 'empty' || scenario === 'advancing' ? [] : [{ seq: scenario === 'bad_order' ? 49 : 51 }]
     return Response.json({ consumer: tool, consumes: ['ERP_SALES_PERIOD_CLOSED'], events, next_seq: scenario === 'empty' || scenario === 'advancing' ? 50 : 51 })
   })
-  assert.equal(report.status, ['unauthorized', 'bad_order'].includes(scenario) ? 'unverified' : 'observed')
+  assert.equal(report.status, ['unauthorized', 'bad_order', 'bad_records'].includes(scenario) ? 'unverified' : 'observed')
   assert.equal(report.state_written, false)
   assert.equal(report.outage_executed, false)
   if (report.status === 'observed') {
@@ -33,7 +34,7 @@ for (const scenario of ['empty', 'pending', 'advancing', 'unauthorized', 'bad_or
     assert.equal(report.cursor_unchanged_during_inspection, scenario !== 'advancing')
     assert.equal(report.records_unchanged_during_inspection, true)
   }
-  assert.ok(calls.length >= 2)
+  assert.ok(calls.length >= (scenario === 'bad_records' ? 1 : 2))
   for (const secret of [...Object.values(variables), 'business-data-not-for-report']) assert.equal(JSON.stringify(report).includes(secret), false)
 }
 assert.equal((await inspectConsumerBacklog({}, tool, async () => assert.fail('no request without credentials'))).status, 'requires_credentials')

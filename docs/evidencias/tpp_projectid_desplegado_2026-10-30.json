@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-30T06:43:00.710Z",
+  "tool": "track_project_progress",
+  "credential_plane": "service_key",
+  "human_roles_not_bypassed": true,
+  "input_fields": [
+    "projectId"
+  ],
+  "uses_preexisting_test_project": true,
+  "stored_project_id_sha256": "671463692b8e53faa2e62ae9a31c4b5200bf11e34f2fa957abc741b0b6db27a2",
+  "configured_business_file_required": false,
+  "evaluation_http_status": 200,
+  "evaluation_status": "at_risk",
+  "unknown_project_http_status": 400,
+  "unknown_project_status": "not_calculable",
+  "state_unchanged": true,
+  "cursor": 7684,
+  "records_count": 3,
+  "records_sha256": "a90d7d3de7ac51f5afca322f534f218cd309c6860967541f47f26738a7aa198d",
+  "central_event_publications": 0,
+  "role_configuration_changed": false
+}

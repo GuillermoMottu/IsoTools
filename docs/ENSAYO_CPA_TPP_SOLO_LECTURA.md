@@ -2,6 +2,8 @@
 
 Alcance: `compare_planned_vs_actual` y `track_project_progress`, para el escenario 7 de PR-ORCA-ENS-001 v1.3. Las otras tools conservan sus responsables.
 
+Resultado actualizado del 30 de octubre: [continuación CPA/TPP](RESULTADO_CONTINUACION_2026-10-30.md). TPP ya está integrado/desplegado con resolución por projectId desde sus registros; se conservaron cursores y datos. La relectura del inventario no encontró entradas históricas nuevas elegibles. Esta página conserva las consultas y el despliegue anteriores como evidencia histórica.
+
 Actualización de alcance: el proyecto está en desarrollo. Los desarrolladores crean y prueban los datos de ensayo y el líder valida las convenciones compartidas y el cierre del checklist. La ausencia de datos empresariales definitivos no bloquea las pruebas locales. Los fixtures y la matriz de responsabilidades vigentes están en [Validación de desarrollo CPA/TPP](DESARROLLO_CPA_TPP.md); la evidencia de eventos guardados que sigue se conserva como resultado histórico.
 
 ## Estado del 29 de octubre de 2026

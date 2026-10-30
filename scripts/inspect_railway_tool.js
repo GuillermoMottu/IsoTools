@@ -111,7 +111,7 @@ export async function inspectConsumerBacklog (variables, toolId, fetcher = fetch
     return response.json()
   }
   function summarize (state) {
-    if (!Number.isSafeInteger(state.cursor) || state.cursor < 0 || !state.records || Array.isArray(state.records)) throw new Error('invalid_state')
+    if (!Number.isSafeInteger(state.cursor) || state.cursor < 0 || !state.records || typeof state.records !== 'object' || Array.isArray(state.records)) throw new Error('invalid_state')
     return { cursor: state.cursor, records_count: Object.keys(state.records).length, records_sha256: createHash('sha256').update(JSON.stringify(state.records)).digest('hex'), rejected_count: Object.keys(state.rejected || {}).length, publication_pending: Boolean(state.pending) }
   }
   try {
