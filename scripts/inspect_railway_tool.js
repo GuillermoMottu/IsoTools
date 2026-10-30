@@ -3,6 +3,7 @@ import { appendFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveAuthConfig } from '../src/tool-auth/oidc-config.js'
+import { parseRoleMap, mapRoles } from '../src/tool-auth/role-mapping.js'
 
 const CENTRAL_API = 'https://api-events.orcalabs.mx/api/v1'
 const CONSUMES = { compare_planned_vs_actual: 'ERP_SALES_PERIOD_CLOSED', track_project_progress: 'KPI_REPORT_GENERATED' }
@@ -25,6 +26,9 @@ export function inspectConfiguration (variables, toolId, configuredHealthUrl = '
   }
   let ssoConfigured = false
   try { ssoConfigured = resolveAuthConfig(authVariables) !== null } catch { /* Report only booleans. */ }
+  const claimReadable = variables.OIDC_ROLES_CLAIM === undefined || typeof variables.OIDC_ROLES_CLAIM === 'string'
+  const mapReadable = variables.ROLE_MAP === undefined || typeof variables.ROLE_MAP === 'string'
+  const mappings = mapReadable ? parseRoleMap(variables.ROLE_MAP) : null
   return {
     tool: toolId,
     api_url_configured: configured(variables, 'ISOTOOLS_API_URL'),
@@ -42,6 +46,12 @@ export function inspectConfiguration (variables, toolId, configuredHealthUrl = '
     tool_api_key_configured: configured(variables, 'TOOL_API_KEY'),
     connector_credential_names_to_review: Object.keys(variables).filter(name => /^(CF_ACCESS_|MICROSIP_|ERP_(HOST|URL|USER|PASSWORD|PASS|TOKEN|API_KEY|CONNECTION|DATABASE))/.test(name) && configured(variables, name)),
     roles_scope_configured: (variables.OIDC_SCOPES || 'openid profile email roles').split(/\s+/).includes('roles'),
+    roles_claim_readable: claimReadable,
+    roles_claim_is_roles: claimReadable ? (variables.OIDC_ROLES_CLAIM?.trim() || 'roles') === 'roles' : null,
+    role_map_readable: mapReadable,
+    role_map_uses_default: mapReadable ? !variables.ROLE_MAP?.trim() : null,
+    operator_role_mapping_valid: mappings ? mapRoles(['operations.manager'], mappings).includes('OperationsManager') : null,
+    auditor_role_mapping_valid: mappings ? mapRoles(['platform.auditor'], mappings).includes('Auditor') : null,
     post_logout_redirect_uri_matches: variables.OIDC_POST_LOGOUT_REDIRECT_URI?.trim().replace(/\/$/, '') === 'https://api-events.orcalabs.mx',
     consumer_enabled: variables.TOOL_CONSUMER_ENABLED === 'true',
     volume_mounted_at_data: variables.RAILWAY_VOLUME_MOUNT_PATH === '/data' ? true : null,
