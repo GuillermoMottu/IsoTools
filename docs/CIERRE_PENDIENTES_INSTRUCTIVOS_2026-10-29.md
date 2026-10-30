@@ -13,6 +13,8 @@ Se publicó en nuestra rama del fork el diagnóstico sanitizado `59433c4` y se e
 
 La última cuenta humana comprobada recibió roles reconocidos vacíos. Con la configuración de nuestras tools ya contrastada, falta que el desarrollador administrador/líder revise asignación y entrega de roles en Logto. No se ha observado el ID token crudo ni se ha repetido una sesión después de un cambio administrativo.
 
+El usuario confirmó que Carlos o el líder administra Logto. Esa revisión no requiere nuevas credenciales personales del usuario ni otra modificación de nuestra política de permisos; se entrega a Carlos/líder con la configuración propia ya comprobada. No se envió un mensaje a terceros desde esta tarea.
+
 ## Diferencia de contrato TPP resuelta en una propuesta implementada
 
 Rama propia: comm/generate_kpis__track_project_progress. Commit de implementación: dff646f. [PR borrador 3 dentro de nuestro fork](https://github.com/GuillermoMottu/IsoTools/pull/3), con destino a nuestra rama de tools, sin tocar main ni upstream. Se conserva en un checkout separado para no mezclar cambios locales y cumplir la regla de ramas por comunicación.
