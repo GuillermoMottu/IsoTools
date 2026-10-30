@@ -20,7 +20,7 @@ El [despliegue correctivo 40831691763](https://github.com/GuillermoMottu/IsoTool
 | Inicio de login y PKCE S256 | 302 hacia Logto | 302 hacia Logto |
 | Respuesta inicial del proveedor | 303, sin invalid_redirect_uri | 303, sin invalid_redirect_uri |
 
-Esto no acredita una sesión humana completa ni roles/logout reales. No se usaron contraseñas de usuarios ni se fabricaron cookies para probar producción. La key local rechazada anteriormente no se reemplazó ni se copió desde Railway: el replay usa la key ya guardada en Actions, sin imprimirla.
+La inspección inicial por HTTP no acreditaba la sesión humana. Las pruebas interactivas posteriores de login, retorno y logout se detallan en el cierre de SSO más abajo. Las credenciales fueron introducidas por el usuario; no se fabricaron cookies para probar producción. La key local rechazada anteriormente no se reemplazó ni se copió desde Railway: el replay usa la key ya guardada en Actions, sin imprimirla.
 
 El identificador real de organización queda pendiente por indicación del usuario. No se utiliza `ORG-001` ni otra identidad de demostración para completar datos reales. No se configuraron metas en producción.
 
@@ -39,7 +39,7 @@ La primera ejecución, 40832924093, detectó que algunos descendientes QA había
 
 Después del replay se releyó el estado autenticado de ambos servicios: los cursores siguen en 7679 y 7684, los registros en 2 y 3, las últimas publicaciones son las mismas y no hay publicación pendiente. No se publicaron entradas QA durante esta restauración y replay.
 
-Para impedir que una ejecución futura desde el main antiguo vuelva a reemplazar nuestros servicios por el core, está preparado el [PR borrador 2 del fork](https://github.com/GuillermoMottu/IsoTools/pull/2). Solo cambia el workflow de CPA/TPP; todavía no está fusionado. Hasta integrar la protección, se debe seleccionar expresamente nuestra rama de trabajo en Run workflow.
+Para impedir que una ejecución futura desde el main antiguo vuelva a reemplazar nuestros servicios por el core, se integró el [PR 2 del fork](https://github.com/GuillermoMottu/IsoTools/pull/2). Solo cambia el workflow de CPA/TPP. El main sin runtime aislado ahora se rechaza; para desplegar la implementación propia se debe seleccionar nuestra rama de trabajo en Run workflow.
 
 ## Continuación de los pendientes
 
@@ -47,9 +47,31 @@ La [reconsulta 40977402839](https://github.com/GuillermoMottu/IsoTools/actions/r
 
 La [inspección 40978055458](https://github.com/GuillermoMottu/IsoTools/actions/runs/40978055458) volvió a confirmar consumidores habilitados, key central válida, identidad correcta y SSO en ambos servicios. Además consultó la configuración de Railway sin descifrar variables: ninguno de nuestros dos servicios tiene fuente GitHub conectada. La consulta usa la API GraphQL oficial únicamente con una operación query; no cambia la configuración del proveedor.
 
-El PR preventivo #2 quedó reducido a un diff de 16 adiciones, con checks aprobados sobre `55cf5c2f1c8143cd4c8f7fb288ec21f91676d892`. La fusión no se realizó: requiere autorización explícita para integrar en main. Ese push también puede disparar el workflow del core del fork, ajeno al alcance de nuestras tools; se preparó una fusión de mantenimiento con los workflows automáticos omitidos solo en ese commit. No se deshabilitaron workflows ni se cambió main durante esta continuación.
+El PR preventivo #2 quedó reducido a un diff de 16 adiciones, con checks aprobados sobre `55cf5c2f1c8143cd4c8f7fb288ec21f91676d892`. Después de recibir autorización explícita se integró con los workflows automáticos omitidos solo en ese commit de mantenimiento, para evitar el despliegue ajeno del core. No se deshabilitaron workflows permanentemente ni se modificó código del core.
 
-Se abrió el login real de CPA y se llegó a la pantalla de acceso de Logto. Completar la sesión humana requiere que el usuario inicie sesión; no se ingresaron credenciales ni se fabricaron cookies. Roles, retorno al deep link, sesión en TPP y logout permanecen pendientes hasta contar con esa sesión.
+El usuario completó el login y el consentimiento de Logto. Login, retorno al deep link, sesión en TPP y logout quedaron comprobados. La prueba positiva de permisos queda pendiente porque la cuenta de prueba no recibe roles reconocidos por las tools; no se fabricaron cookies ni se concedieron permisos por código.
+
+## Cierre de integración y SSO humano
+
+El usuario autorizó expresamente integrar el PR #2. Se fusionó en main del fork como `928e11d93cee68b14be05449202ee28658d97d35`, con un diff de 16 adiciones al workflow de nuestras dos tools. Sus checks estaban aprobados y el commit de mantenimiento omitió los workflows automáticos; la consulta de runs para ese SHA devolvió una lista vacía.
+
+La protección se comprobó con los dos pasos shell exactos extraídos del workflow fusionado. Se ejecutaron en una imagen local Node 22.23.3, sin red, sin credenciales de despliegue, con raíz de solo lectura y fixtures públicos: el main sin runtime aislado fue rechazado para CPA y TPP; los archivos del runtime correcto fueron aceptados y seleccionaron el railway.toml de cada tool. No se ejecutó el workflow potencialmente productivo para esta prueba ni se desplegaron nuevas imágenes.
+
+Con participación del usuario se completó una sesión real de Logto. El usuario introdujo sus credenciales y autorizó el consentimiento; no se guardaron credenciales, tokens, cookies ni datos identificativos de la cuenta en esta evidencia.
+
+| Prueba humana | CPA | TPP |
+| --- | --- | --- |
+| Retorno del login a la tool | Comprobado | Comprobado reutilizando la sesión del IdP, sin otra contraseña |
+| auth/me con sesión real | authenticated=true, mode=sso | authenticated=true, mode=sso |
+| Roles reconocidos por la tool | roles=[], role=null | roles=[], role=null |
+| Consulta de registros sin rol | insufficient_role; exige OperationsManager o Auditor | insufficient_role; exige OperationsManager o Auditor |
+| Retorno real al enlace solicitado | /deep/check?qa=1 | /deep/check?qa=1 |
+| Logout desde la interfaz | Retorna a https://api-events.orcalabs.mx/ | Retorna a https://api-events.orcalabs.mx/ |
+| auth/me después de logout | authenticated=false, mode=sso | authenticated=false, mode=sso |
+
+La prueba de lectura denegada sin roles está observada con usuario real. No se realizó una operación de negocio ni se declara cerrada la prueba positiva con un usuario autorizado. Tampoco se observaron los claims crudos del ID token: roles=[] es el resultado reconocido por nuestras tools y no distingue por sí solo entre rol no asignado, claim no emitido o vocabulario no mapeado.
+
+Plataforma debe verificar la cuenta de prueba, asignar el rol que corresponda y asegurar su entrega en el ID token solicitado por nuestras tools. El mapeo implementado reconoce `operations.manager` como `OperationsManager` y `platform.auditor` como `Auditor`; el acceso de operación requiere OperationsManager y el auditor tiene lectura. Las tools ya solicitan el scope roles. La documentación oficial de Logto describe la combinación entre scope y configuración del claim en [Custom ID token](https://docs.logto.io/developers/custom-id-token). Después de ajustar la autorización hay que iniciar una sesión nueva y repetir el caso positivo. No se concedieron roles desde el código ni se cambió la política para eludir la denegación.
 
 ## Cómo ejecutar el replay
 
@@ -87,7 +109,7 @@ Un job exitoso acredita que la consulta terminó. No significa que CPA o TPP hay
 
 1. Proporcionar la organización real y acordar la meta y contexto del ensayo cuando corresponda.
 2. Disponer de entradas guardadas con la procedencia y el contexto requeridos; si faltan, registrar esa dependencia en el contrato sin implementar otra tool.
-3. Completar login humano, roles, deep link y logout.
+3. Completar las pruebas de permisos con cuentas reales autorizadas. Login humano, deep link y logout ya están comprobados; la lectura sin rol fue rechazada. No se probó una operación de negocio con esa cuenta.
 4. Revisar los resultados del replay y la configuración histórica antes de aprobar los PV de nuestras tools.
 
 ## Validación
