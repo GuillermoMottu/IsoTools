@@ -82,6 +82,7 @@ Campos emitidos en `PROJECT_AT_RISK`:
 - [[generate_kpis]] - `KPI_REPORT_GENERATED` -> [[../comunicaciones/generate_kpis__track_project_progress]]
 
 ## Bitacora de cambios
+- [2026-10-29] (codex) Adaptación de entrada por projectId con registro local explícito de proyectos; mantiene cálculo, permisos y validación de datos incompletos. Propuesta en comm/generate_kpis__track_project_progress, sin fuente empresarial ni publicación histórica fabricada.
 <!-- Anota aqui cada cambio de contrato/logica que pueda afectar a otras tools.
      Formato sugerido:  - [YYYY-MM-DD] (tu-nombre) que cambio y a quien afecta -->
 - [2026-06-28] (auto) nota inicial generada desde la configuracion.

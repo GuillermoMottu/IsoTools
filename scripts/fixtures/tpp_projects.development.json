@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "QA-PRJ-ISO": {
+      "test": true,
+      "organization_id": "QA-ORG-CPA-TPP",
+      "project_id": "QA-PRJ-ISO",
+      "project_name": "Proyecto de desarrollo TPP",
+      "as_of_date": "2026-10-29T12:00:00Z",
+      "planned_start_date": "2026-10-01T00:00:00Z",
+      "planned_end_date": "2026-11-30T00:00:00Z",
+      "planned_progress_percent": 40,
+      "actual_progress_percent": 34,
+      "milestones": [],
+      "target_type": "order",
+      "target_ids": ["QA-ORDER-ISO"]
+    }
+  }
+}

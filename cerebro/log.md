@@ -7,6 +7,9 @@ updated: 2026-06-28
 
 Registro cronológico de cambios significativos en el vault. Una línea por evento.
 
+## [2026-10-29] TPP por projectId
+- Propuesta en comm/generate_kpis__track_project_progress: resolver contexto desde configuración propia para aceptar el identificador del contrato original; API, consumidor y replay comparten el adaptador. Ver comunicaciones/generate_kpis__track_project_progress y docs/TPP_PROJECT_CONTEXT.md. No se implementan ni modifican otras tools.
+
 ## [2026-06-28] init
 - Vault creado al separar las tools de la plataforma web en el repo **IsoTools**.
 - Generadas las notas iniciales: 125 tools, 90 comunicaciones, 13 agentes (`npm run cerebro:generar`).
