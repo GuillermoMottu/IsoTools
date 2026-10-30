@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { appendFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -97,6 +98,42 @@ export async function inspectConnection (variables, toolId, configuredHealthUrl 
       report.anonymous_api_rejected = api.status === 401 && apiBody.error === 'authentication_required'
     } catch { report.health_connection_failed = true }
   }
+  return report
+}
+
+export async function inspectConsumerBacklog (variables, toolId, fetcher = fetch) {
+  if (!CONSUMES[toolId]) throw new Error('invalid_tool')
+  const report = { status: 'requires_credentials', methods: ['GET'], state_written: false, outage_executed: false }
+  if (![variables.TOOL_API_KEY, variables.ISOTOOLS_API_KEY].every(key => typeof key === 'string' && key.trim())) return report
+  async function get (url, key) {
+    const response = await fetcher(url, { method: 'GET', headers: { 'x-api-key': key }, redirect: 'error', signal: AbortSignal.timeout(15000) })
+    if (!response.ok) throw new Error('read_failed')
+    return response.json()
+  }
+  function summarize (state) {
+    if (!Number.isSafeInteger(state.cursor) || state.cursor < 0 || !state.records || Array.isArray(state.records)) throw new Error('invalid_state')
+    return { cursor: state.cursor, records_count: Object.keys(state.records).length, records_sha256: createHash('sha256').update(JSON.stringify(state.records)).digest('hex'), rejected_count: Object.keys(state.rejected || {}).length, publication_pending: Boolean(state.pending) }
+  }
+  try {
+    const statusUrl = `${TOOL_ORIGINS[toolId]}/api/tool/status`
+    report.before = summarize(await get(statusUrl, variables.TOOL_API_KEY))
+    const batch = await get(`${CENTRAL_API}/events/subscriptions/${toolId}?since_seq=${report.before.cursor}&limit=1000`, variables.ISOTOOLS_API_KEY)
+    if (batch.consumer !== toolId || !batch.consumes?.includes(CONSUMES[toolId]) || !Array.isArray(batch.events) || !Number.isSafeInteger(Number(batch.next_seq))) throw new Error('invalid_subscription')
+    let previous = report.before.cursor
+    for (const row of batch.events) {
+      const seq = Number(row.seq)
+      if (!Number.isSafeInteger(seq) || seq <= previous || seq > Number(batch.next_seq)) throw new Error('invalid_subscription')
+      previous = seq
+    }
+    if (Number(batch.next_seq) < previous) throw new Error('invalid_subscription')
+    report.subscription_count = batch.events.length
+    report.subscription_next_seq = Number(batch.next_seq)
+    report.subscription_page_complete = batch.events.length < 1000
+    report.after = summarize(await get(statusUrl, variables.TOOL_API_KEY))
+    report.cursor_unchanged_during_inspection = report.before.cursor === report.after.cursor
+    report.records_unchanged_during_inspection = report.before.records_sha256 === report.after.records_sha256
+    report.status = 'observed'
+  } catch { report.status = 'unverified' }
   return report
 }
 
@@ -235,6 +272,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       variables = railwayJson(['variable', 'list', '--service', process.env.RAILWAY_SERVICE, '--json'])
     } catch { throw new Error('railway_variables_query_failed') }
     const report = await inspectConnection(variables, process.env.TOOL_PAGE_ID, process.env.HEALTH_URL)
+    report.backlog = await inspectConsumerBacklog(variables, process.env.TOOL_PAGE_ID)
     if (report.health_url) Object.assign(report, await inspectFrontendBundle(variables, report.health_url))
     try {
       const volumeList = railwayJson(['volume', '--service', process.env.RAILWAY_SERVICE, 'list', '--json'])
