@@ -50,6 +50,14 @@ jobs:
           fi
           echo "Service: $RAILWAY_SERVICE"
           echo "Dockerfile: $RAILWAY_DOCKERFILE_PATH"
+          config_file="${RAILWAY_DOCKERFILE_PATH%.Dockerfile}.railway.toml"
+          if [ ! -f src/tool-server.js ] || [ ! -f src/services/toolConsumer.js ] ||
+             [ ! -f "$config_file" ] ||
+             ! grep -Fq 'CMD ["node", "src/tool-server.js"]' "$RAILWAY_DOCKERFILE_PATH"; then
+            echo "::error::Esta referencia no contiene el runtime aislado de CPA/TPP. Selecciona la rama comm/sync_erp_data_local__compare_planned_vs_actual en Run workflow."
+            exit 1
+          fi
+          cp "$config_file" railway.toml
 
       - uses: actions/setup-node@v7
         with:
@@ -106,6 +114,14 @@ jobs:
           fi
           echo "Service: $RAILWAY_SERVICE"
           echo "Dockerfile: $RAILWAY_DOCKERFILE_PATH"
+          config_file="${RAILWAY_DOCKERFILE_PATH%.Dockerfile}.railway.toml"
+          if [ ! -f src/tool-server.js ] || [ ! -f src/services/toolConsumer.js ] ||
+             [ ! -f "$config_file" ] ||
+             ! grep -Fq 'CMD ["node", "src/tool-server.js"]' "$RAILWAY_DOCKERFILE_PATH"; then
+            echo "::error::Esta referencia no contiene el runtime aislado de CPA/TPP. Selecciona la rama comm/sync_erp_data_local__compare_planned_vs_actual en Run workflow."
+            exit 1
+          fi
+          cp "$config_file" railway.toml
 
       - uses: actions/setup-node@v7
         with:
