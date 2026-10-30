@@ -2,6 +2,8 @@
 
 Fecha: 20 de octubre de 2026. Este archivo no contiene secretos y no se envió automáticamente a otra persona.
 
+Actualización del 29 de octubre: la [validación de desarrollo CPA/TPP](DESARROLLO_CPA_TPP.md) contiene los casos locales y responsables vigentes. Solo desarrolladores y líder crean o validan en esta etapa. Las referencias posteriores a callbacks rechazadas y a aceptación empresarial pertenecen a la revisión histórica del día 20; no son bloqueos actuales para desarrollar.
+
 Actualización: este documento conserva la evidencia histórica del día 20. El cierre y los pendientes vigentes de nuestras dos tools están en [Ensayo de solo lectura CPA/TPP](ENSAYO_CPA_TPP_SOLO_LECTURA.md). Login humano, callbacks, retorno al deep link y logout ya fueron comprobados en ambas tools. La cuenta de prueba autentica, pero recibe roles reconocidos vacíos y no puede consultar registros; queda pendiente asignar/emitir los roles correctos y comprobar el acceso autorizado. El PR preventivo #2 ya está integrado.
 
 Nuestras tools ya tienen SSO obligatorio, secretos propios, consumidor habilitado y volumen persistente. Los deployments consultados por CI están en SUCCESS. Faltan las acciones y pruebas de cierre siguientes.

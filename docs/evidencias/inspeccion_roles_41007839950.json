@@ -1,0 +1,286 @@
+[
+  {
+    "tool": "track_project_progress",
+    "api_url_configured": true,
+    "api_url_matches": true,
+    "api_url_is_origin_only": false,
+    "api_key_configured": true,
+    "api_key_readable": true,
+    "tool_id_matches": true,
+    "dockerfile_matches": true,
+    "open_mode_configured": false,
+    "sso_configured": true,
+    "sso_missing_variables": [],
+    "redirect_uri_matches": true,
+    "session_secret_configured": true,
+    "tool_api_key_configured": true,
+    "connector_credential_names_to_review": [],
+    "roles_scope_configured": true,
+    "roles_claim_readable": true,
+    "roles_claim_is_roles": true,
+    "role_map_readable": true,
+    "role_map_uses_default": true,
+    "operator_role_mapping_valid": true,
+    "auditor_role_mapping_valid": true,
+    "post_logout_redirect_uri_matches": true,
+    "consumer_enabled": true,
+    "volume_mounted_at_data": true,
+    "state_path_matches": true,
+    "business_config_configured": false,
+    "health_url": "https://tpp.orcalabs.mx/health",
+    "central_api_key_works": true,
+    "central_http_status": 200,
+    "health_http_status": 200,
+    "deployed_tool_identity_matches": true,
+    "deployed_build_sha": "5dd8fb199636c51053a10055da508b4a659cf400",
+    "deployed_auth_mode_sso": true,
+    "deployed_auth_mode_open": false,
+    "anonymous_session_rejected": true,
+    "anonymous_api_rejected": true,
+    "frontend_bundle_checked": true,
+    "frontend_key_leak": false,
+    "frontend_actual_key_checked": true,
+    "frontend_actual_client_secret_checked": true,
+    "frontend_actual_session_secret_checked": true,
+    "state_directory_persistent": true,
+    "volume_query_succeeded": true,
+    "deployment_query_succeeded": true,
+    "latest_deployment_status": "SUCCESS",
+    "runtime_log_queries_succeeded": true,
+    "runtime_log_lines_read": 103,
+    "runtime_json_logs_read": 103,
+    "observed_log_actions": [
+      "poll",
+      "retry"
+    ],
+    "runtime_log_samples": [
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:18:42.466Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:19:02.491Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:19:02.540Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:19:22.519Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:19:22.600Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:19:42.518Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:19:42.655Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:20:02.496Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7684,
+        "count": 0,
+        "next_seq": 7684,
+        "timestamp": "2026-10-30T05:20:02.722Z"
+      },
+      {
+        "action": "retry",
+        "retry_after_ms": 10000,
+        "timestamp": "2026-10-29T23:26:55.180Z"
+      },
+      {
+        "action": "retry",
+        "retry_after_ms": 10000,
+        "timestamp": "2026-10-29T23:28:02.839Z"
+      },
+      {
+        "action": "retry",
+        "retry_after_ms": 20000,
+        "timestamp": "2026-10-29T23:28:22.745Z"
+      }
+    ],
+    "latest_deployment_id": "71caf337-9af1-4426-8b93-2be14f75ed87",
+    "source_query_succeeded": true,
+    "github_source_connected": false,
+    "github_source_is_our_fork": false,
+    "main_push_may_deploy": false
+  },
+  {
+    "tool": "compare_planned_vs_actual",
+    "api_url_configured": true,
+    "api_url_matches": true,
+    "api_url_is_origin_only": false,
+    "api_key_configured": true,
+    "api_key_readable": true,
+    "tool_id_matches": true,
+    "dockerfile_matches": true,
+    "open_mode_configured": false,
+    "sso_configured": true,
+    "sso_missing_variables": [],
+    "redirect_uri_matches": true,
+    "session_secret_configured": true,
+    "tool_api_key_configured": true,
+    "connector_credential_names_to_review": [],
+    "roles_scope_configured": true,
+    "roles_claim_readable": true,
+    "roles_claim_is_roles": true,
+    "role_map_readable": true,
+    "role_map_uses_default": true,
+    "operator_role_mapping_valid": true,
+    "auditor_role_mapping_valid": true,
+    "post_logout_redirect_uri_matches": true,
+    "consumer_enabled": true,
+    "volume_mounted_at_data": true,
+    "state_path_matches": true,
+    "business_config_configured": false,
+    "health_url": "https://cpa.orcalabs.mx/health",
+    "central_api_key_works": true,
+    "central_http_status": 200,
+    "health_http_status": 200,
+    "deployed_tool_identity_matches": true,
+    "deployed_build_sha": "5dd8fb199636c51053a10055da508b4a659cf400",
+    "deployed_auth_mode_sso": true,
+    "deployed_auth_mode_open": false,
+    "anonymous_session_rejected": true,
+    "anonymous_api_rejected": true,
+    "frontend_bundle_checked": true,
+    "frontend_key_leak": false,
+    "frontend_actual_key_checked": true,
+    "frontend_actual_client_secret_checked": true,
+    "frontend_actual_session_secret_checked": true,
+    "state_directory_persistent": true,
+    "volume_query_succeeded": true,
+    "deployment_query_succeeded": true,
+    "latest_deployment_status": "SUCCESS",
+    "runtime_log_queries_succeeded": true,
+    "runtime_log_lines_read": 101,
+    "runtime_json_logs_read": 101,
+    "observed_log_actions": [
+      "poll",
+      "retry"
+    ],
+    "runtime_log_samples": [
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:18:11.953Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:18:31.934Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:18:32.001Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:18:51.997Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:18:52.047Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:19:12.046Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:19:12.102Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:19:32.101Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:19:32.145Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:19:52.139Z"
+      },
+      {
+        "action": "poll",
+        "cursor": 7679,
+        "count": 0,
+        "next_seq": 7679,
+        "timestamp": "2026-10-30T05:19:52.187Z"
+      },
+      {
+        "action": "retry",
+        "retry_after_ms": 10000,
+        "timestamp": "2026-10-29T23:28:25.592Z"
+      }
+    ],
+    "latest_deployment_id": "b804e963-6ed7-4920-90e4-c631672e5e89",
+    "source_query_succeeded": true,
+    "github_source_connected": false,
+    "github_source_is_our_fork": false,
+    "main_push_may_deploy": false
+  }
+]

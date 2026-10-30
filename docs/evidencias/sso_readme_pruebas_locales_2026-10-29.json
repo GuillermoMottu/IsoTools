@@ -1,0 +1,25 @@
+{
+  "readme_blob": "38888a66b6a1884579e1e13e621f262b07c16710",
+  "verification": "local_tests_only",
+  "real_logto_session_repeated": false,
+  "tests": {
+    "handshake_cpa": {
+      "exit_code": 0,
+      "passed": true,
+      "scope": "local_oidc_fixture_in_network_isolated_node22",
+      "expected_negative_token_errors": true
+    },
+    "handshake_tpp": {
+      "exit_code": 0,
+      "passed": true,
+      "scope": "local_oidc_fixture_in_network_isolated_node22",
+      "expected_negative_token_errors": true
+    },
+    "configuration": {
+      "exit_code": 0,
+      "passed": true,
+      "scope": "local_configuration_functions",
+      "expected_negative_token_errors": false
+    }
+  }
+}
