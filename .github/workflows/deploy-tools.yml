@@ -86,6 +86,9 @@ jobs:
           node scripts/test_tool_service.js
           node scripts/test_sso_handshake.js
 
+      - name: Test deployment source inspection
+        run: node scripts/test_deployment_source.js
+
       - name: Install Railway CLI
         run: npm i -g @railway/cli@5.67.1
 
@@ -174,6 +177,9 @@ jobs:
           node scripts/test_tool_service.js
           node scripts/test_sso_handshake.js --track
 
+      - name: Test deployment source inspection
+        run: node scripts/test_deployment_source.js
+
       - name: Install Railway CLI
         run: npm i -g @railway/cli@5.67.1
 
@@ -249,7 +255,7 @@ jobs:
         run: node scripts/test_readonly_replay.js
       - name: Read existing inputs and compare historical outputs
         env:
-          ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_API_KEY }}
+          ISOTOOLS_API_KEY: ${{ secrets.ISOTOOLS_READONLY_API_KEY || secrets.ISOTOOLS_API_KEY }}
           REPLAY_ORGANIZATION_ID: ${{ vars.ISOTOOLS_ORGANIZATION_ID || '' }}
           TOOL_SELECTED: ${{ inputs.tool }}
         run: node scripts/replay_tools_readonly.js

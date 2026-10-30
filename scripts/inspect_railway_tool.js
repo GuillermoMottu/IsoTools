@@ -140,6 +140,32 @@ export function deploymentConfigurationReady (report) {
     report.state_directory_persistent === true && Boolean(report.health_url)
 }
 
+export async function inspectDeploymentSource (variables, token, fetcher = fetch) {
+  const report = { source_query_succeeded: false, github_source_connected: null, github_source_is_our_fork: null, main_push_may_deploy: null }
+  try {
+    const { RAILWAY_ENVIRONMENT_ID: environmentId, RAILWAY_PROJECT_ID: projectId, RAILWAY_SERVICE_ID: serviceId } = variables
+    if (!token || ![environmentId, projectId, serviceId].every(id => /^[a-f0-9-]{36}$/i.test(id || ''))) return report
+    const query = 'query ToolDeploymentSource($id: String!, $projectId: String!) { environment(id: $id, projectId: $projectId) { config(decryptVariables: false) serviceInstances(first: 100) { edges { node { serviceId source { repo image } } } } } }'
+    const response = await fetcher('https://backboard.railway.com/graphql/v2', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Project-Access-Token': token },
+      body: JSON.stringify({ query, variables: { id: environmentId, projectId } }), redirect: 'error', signal: AbortSignal.timeout(15000)
+    })
+    if (!response.ok) return report
+    const payload = await response.json()
+    if (payload.errors?.length) return report
+    const environment = payload.data?.environment
+    const instance = environment?.serviceInstances?.edges?.find(edge => edge.node.serviceId === serviceId)?.node
+    if (!instance || !Object.hasOwn(instance, 'source')) return report
+    const config = typeof environment.config === 'string' ? JSON.parse(environment.config) : environment.config
+    const source = config?.services?.[serviceId]?.source
+    const repo = instance.source?.repo || source?.repo
+    const connected = Boolean(repo)
+    const repoKnown = typeof repo === 'string' && /^(?:https:\/\/github\.com\/)?[\w.-]+\/[\w.-]+\/?$/i.test(repo)
+    const isFork = repoKnown ? repo.replace(/^https:\/\/github\.com\//i, '').replace(/\/$/, '').replace(/\.git$/i, '').toLowerCase() === 'guillermomottu/isotools' : null
+    return { source_query_succeeded: true, github_source_connected: connected, github_source_is_our_fork: connected ? isFork : false, main_push_may_deploy: !connected || isFork === false ? false : isFork === true && source?.branch?.trim() ? source.branch === 'main' : null }
+  } catch { return report }
+}
+
 export function railwayText (args, input) {
   return execFileSync('railway', args, { input, encoding: 'utf8', stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], timeout: 60000, maxBuffer: 5 * 1024 * 1024 })
 }
@@ -207,6 +233,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       report.volume_query_succeeded = true
     } catch { report.volume_query_succeeded = false }
     Object.assign(report, inspectRailwayOperations(process.env.TOOL_PAGE_ID, process.env.RAILWAY_SERVICE))
+    Object.assign(report, await inspectDeploymentSource(variables, process.env.RAILWAY_TOKEN))
     console.log(JSON.stringify(report, null, 2))
     if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### ${report.tool}\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`)
     if (report.health_url && process.env.GITHUB_ENV) await appendFile(process.env.GITHUB_ENV, `HEALTH_URL=${report.health_url}\n`)
