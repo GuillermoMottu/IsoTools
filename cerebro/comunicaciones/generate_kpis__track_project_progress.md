@@ -59,6 +59,10 @@ tags: [comunicacion, KPI_REPORT_GENERATED]
 
 ## Bitacora de la comunicacion
 
+- [2026-10-30] (codex) El adaptador de TPP usa por defecto los proyectos ya conservados en su propio estado; projects explícito en configuración sustituye esa fuente. Pruebas de API y consumo tras reinicio mantienen prioridades, marca test y cursor. El replay continúa sin acceder al volumen desplegado.
+
+- [2026-10-29] (codex) Propuesta compatible con el brief original: TPP acepta projectId/project_id y resuelve los campos faltantes desde projects en TOOL_BUSINESS_CONFIG_FILE; entrada explícita tiene prioridad. Consumidor, API y replay comparten resolución. Sin proyecto/contexto sigue not_calculable; contextos sintéticos conservan marca test. No exige ampliar el productor generate_kpis; pendiente validar con líder y otro desarrollador la fuente compartida. Detalle en docs/TPP_PROJECT_CONTEXT.md.
+
 - [2026-10-13] (codex) Runbook: contexto de proyecto recibido se normaliza sin inventar ID, fechas o avance; una entrada no calculable se conserva en `rejected` y avanza cursor. Contexto completo se prueba con datos QA marcados, no acredita datos reales del ERP.
 <!-- Cada cambio en el contrato entre estas dos tools se anota aqui.
      Asi el programador del otro lado ve que cambio sin leer el codigo.

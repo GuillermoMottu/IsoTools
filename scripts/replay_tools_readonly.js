@@ -21,7 +21,10 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
   }
   for (const [toolId, contract] of Object.entries(TOOL_CONTRACTS)) {
     if (selectedTool !== 'all' && selectedTool !== toolId) continue
-    let cursor = 0, total = 0, tests = 0, complete = false
+    let cursor = 0
+    let total = 0
+    let tests = 0
+    let complete = false
     const candidates = []
     for (let page = 0; page < 100; page++) {
       const batch = await get(`/events/subscriptions/${toolId}?since_seq=${cursor}&limit=1000`)
@@ -44,7 +47,8 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
     const item = { tool: toolId, consumes: contract.consumes, inventory_count: total, marked_test_count: tests, inventory_complete: complete }
     report.tools.push(item)
     if (!complete) throw new Error('inventory_page_limit_reached')
-    let latest = null, chain = null
+    let latest = null
+    let chain = null
     item.excluded_qa_lineage_count = 0
     const chains = new Map()
     while (candidates.length) {
@@ -68,10 +72,15 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
     const result = evaluateConsumerInput(toolId, event, input)
     const erpOrigin = sourceId(event) === 'erp_connector' || chain.events.some(row => sourceId(row) === 'erp_connector' && outputType(row) === 'ERP_SALES_PERIOD_CLOSED')
     Object.assign(item, {
-      status: 'evaluated', input_seq: Number(latest.seq), input_event_id: event.event_id, correlation_id: correlationId,
-      source_module: sourceId(event), erp_origin_in_chain: erpOrigin,
+      status: 'evaluated',
+      input_seq: Number(latest.seq),
+      input_event_id: event.event_id,
+      correlation_id: correlationId,
+      source_module: sourceId(event),
+      erp_origin_in_chain: erpOrigin,
       input_sha256: createHash('sha256').update(JSON.stringify(latest)).digest('hex'),
       baseline: fieldsFor(result),
+      configured_context_is_test: input.test === true,
       historical_output_count: historical.length,
       historical_outputs: historical.map(row => ({ event_id: row.event_id, status: row.data?.status, status_matches: row.data?.status === result.status })),
       calculation_version: result.audit?.calculation_version || null,
@@ -86,7 +95,7 @@ export async function replayToolsReadonly ({ apiKey, organizationId, businessCon
       item.actual_preserved = actual === targetInput.metrics[0].actual
       item.sales_target_trial = { multiplier: 1.5, configured_only_in_memory: true, ...fieldsFor(targetResult) }
     }
-    item.acceptance = erpOrigin && result.status !== 'not_calculable' && historical.length === 1 && historical[0].data?.status === result.status ? 'status_matches_requires_configuration_review' : 'requires_review'
+    item.acceptance = input.test !== true && erpOrigin && result.status !== 'not_calculable' && historical.length === 1 && historical[0].data?.status === result.status ? 'status_matches_requires_configuration_review' : 'requires_review'
   }
   return report
 }

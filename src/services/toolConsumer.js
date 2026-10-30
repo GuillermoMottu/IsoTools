@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { projectFields } from '../utils/projectContext.js'
+import { projectFields, resolveProjectContext } from '../utils/projectContext.js'
 import { evaluatePlannedVsActual } from '../tools/compare_planned_vs_actual.js'
 import { evaluateProjectProgress } from '../tools/track_project_progress.js'
 import { validateEventPayload } from './validationService.js'
@@ -66,7 +66,10 @@ export function salesInput (event, config = {}) {
 
 export function consumerInput (toolId, event, config = {}) {
   if (!TOOL_CONTRACTS[toolId]) throw new Error('unknown_tool')
-  return toolId === 'compare_planned_vs_actual' ? salesInput(event, config) : { ...event.data, ...projectFields(event.data), source: event.data.source || { source_system: event.module?.id || event.module_id || 'Bus de KPIs', source_extracted_at: event.timestamp, source_record_ids: [event.event_id] }, ...(event.metadata?.test ? { test: true } : {}) }
+  if (toolId === 'compare_planned_vs_actual') return salesInput(event, config)
+  const input = resolveProjectContext(event.data, config)
+  const contextIds = Array.isArray(input.source?.source_record_ids) ? input.source.source_record_ids : []
+  return { ...input, source: event.data.source || { source_system: event.module?.id || event.module_id || 'Bus de KPIs', source_extracted_at: event.timestamp, source_record_ids: [...new Set([event.event_id, ...contextIds])] }, ...(event.metadata?.test ? { test: true } : {}) }
 }
 
 // Shared by the live consumer and the isolated replay; evaluation has no I/O.
@@ -75,11 +78,17 @@ export function evaluateConsumerInput (toolId, event, input) {
   // ERP_CENTRAL: preserve the actual even when no approved sales target exists.
   if (toolId !== 'compare_planned_vs_actual' || Array.isArray(event.data.metrics) || input.metrics[0].planned !== null) return result
   return {
-    ...result, module: 'sales', status: 'sin_meta',
+    ...result,
+    module: 'sales',
+    status: 'sin_meta',
     summary: 'Ventas reales recibidas; no hay meta aprobada para comparar.',
-    deviation_percent: null, deviationPercent: null, weighted_deviation_percent: null,
+    deviation_percent: null,
+    deviationPercent: null,
+    weighted_deviation_percent: null,
     details: {
-      planned: null, actual: input.metrics[0].actual, unit: event.data.unit,
+      planned: null,
+      actual: input.metrics[0].actual,
+      unit: event.data.unit,
       metrics: [{ ...input.metrics[0], status: 'sin_meta', variance: null, variance_percent: null, adverse_percent: null }]
     },
     recommended_actions: ['define_sales_target']
@@ -122,7 +131,8 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
       method: output ? 'POST' : 'GET',
       headers: { 'x-api-key': apiKey, ...(output ? { 'content-type': 'application/json' } : {}) },
       ...(output ? { body: JSON.stringify(output) } : {}),
-      signal: AbortSignal.timeout(15000), redirect: 'error'
+      signal: AbortSignal.timeout(15000),
+      redirect: 'error'
     })
     if (!response.ok) throw new Error(`central_http_${response.status}`)
     const payload = await response.json()
@@ -170,6 +180,7 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
           continue
         }
         const config = businessConfigFile ? JSON.parse(await readFile(businessConfigFile, 'utf8')) : {}
+        if (toolId === 'track_project_progress' && config.projects === undefined) config.projects = state.records
         let event, input
         try {
           event = subscriptionEvent(row, contract.consumes)
@@ -208,12 +219,16 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
           continue
         }
         const output = {
-          event_id: randomUUID(), timestamp: new Date().toISOString(), platform_version: '1.0',
-          module: { id: toolId, version: '1.0.0' }, asset: event.asset,
+          event_id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          platform_version: '1.0',
+          module: { id: toolId, version: '1.0.0' },
+          asset: event.asset,
           event: { type: contract.produces, category: contract.category, severity: result.severity },
           data: { ...result, ...(toolId === 'compare_planned_vs_actual' ? { source_period: event.data.period } : {}) },
-          correlation_id: event.correlation_id || event.event_id, causation_id: event.event_id,
-          ...(event.metadata?.test ? { metadata: { test: true } } : {})
+          correlation_id: event.correlation_id || event.event_id,
+          causation_id: event.event_id,
+          ...(event.metadata?.test || input.test === true ? { metadata: { test: true } } : {})
         }
         if (!validateEventPayload(output).valid) throw new Error('invalid_output_event')
         state.pending = { inputSeq: sequence(row.seq), output, salesKey, signature }

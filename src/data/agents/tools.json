@@ -988,15 +988,10 @@
     "descriptionEn": "Monitors planned vs actual progress, milestones, budget and project risk.",
     "inputSchema": {
       "type": "object",
-      "required": [
-        "organization_id",
-        "project_id",
-        "project_name",
-        "as_of_date",
-        "planned_start_date",
-        "planned_end_date",
-        "planned_progress_percent",
-        "actual_progress_percent"
+      "description": "projectId o project_id identifica el proyecto. El servicio resuelve el contexto desde projects en TOOL_BUSINESS_CONFIG_FILE; los campos recibidos tienen prioridad y los datos incompletos no generan alertas.",
+      "anyOf": [
+        { "required": ["project_id"] },
+        { "required": ["projectId"] }
       ],
       "properties": {
         "organization_id": {
@@ -1023,7 +1018,8 @@
           "minLength": 1
         },
         "projectId": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "project_name": {
           "type": "string",

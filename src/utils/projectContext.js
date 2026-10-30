@@ -27,3 +27,18 @@ export function projectFields (input) {
   if (input.source !== undefined) fields.source = input.source
   return fields
 }
+
+// An explicit project registry supplies context; incoming facts retain precedence.
+export function resolveProjectContext (input, config = {}) {
+  const supplied = projectFields(input)
+  const id = supplied.project_id
+  if (config.projects === undefined || typeof id !== 'string' || !id.trim()) return { ...input, ...supplied }
+  const projects = config.projects
+  if (!projects || typeof projects !== 'object' || Array.isArray(projects)) throw new Error('invalid_project_context')
+  if (!Object.hasOwn(projects, id)) return { ...input, ...supplied }
+  const project = projects[id]
+  if (!project || typeof project !== 'object' || Array.isArray(project)) throw new Error('invalid_project_context')
+  const context = projectFields(project)
+  if (context.project_id !== id) throw new Error('invalid_project_context')
+  return { ...input, ...context, ...supplied, ...(project.test === true ? { test: true } : {}) }
+}
