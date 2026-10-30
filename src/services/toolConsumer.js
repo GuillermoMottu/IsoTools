@@ -66,7 +66,10 @@ export function salesInput (event, config = {}) {
 
 export function consumerInput (toolId, event, config = {}) {
   if (!TOOL_CONTRACTS[toolId]) throw new Error('unknown_tool')
-  return toolId === 'compare_planned_vs_actual' ? salesInput(event, config) : { ...resolveProjectContext(event.data, config), source: event.data.source || { source_system: event.module?.id || event.module_id || 'Bus de KPIs', source_extracted_at: event.timestamp, source_record_ids: [event.event_id] }, ...(event.metadata?.test ? { test: true } : {}) }
+  if (toolId === 'compare_planned_vs_actual') return salesInput(event, config)
+  const input = resolveProjectContext(event.data, config)
+  const contextIds = Array.isArray(input.source?.source_record_ids) ? input.source.source_record_ids : []
+  return { ...input, source: event.data.source || { source_system: event.module?.id || event.module_id || 'Bus de KPIs', source_extracted_at: event.timestamp, source_record_ids: [...new Set([event.event_id, ...contextIds])] }, ...(event.metadata?.test ? { test: true } : {}) }
 }
 
 // Shared by the live consumer and the isolated replay; evaluation has no I/O.
@@ -177,6 +180,7 @@ export async function createToolConsumer ({ toolId, apiUrl, apiKey, stateDir, bu
           continue
         }
         const config = businessConfigFile ? JSON.parse(await readFile(businessConfigFile, 'utf8')) : {}
+        if (toolId === 'track_project_progress' && config.projects === undefined) config.projects = state.records
         let event, input
         try {
           event = subscriptionEvent(row, contract.consumes)

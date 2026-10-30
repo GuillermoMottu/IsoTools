@@ -49,7 +49,7 @@ export async function createToolApp (env = process.env) {
     }
     const run = toolId === 'compare_planned_vs_actual' ? runComparePlannedVsActualTool : runTrackProjectProgressTool
     const config = toolId === 'track_project_progress' && env.TOOL_BUSINESS_CONFIG_FILE ? JSON.parse(await readFile(env.TOOL_BUSINESS_CONFIG_FILE, 'utf8')) : {}
-    const input = toolId === 'track_project_progress' ? resolveProjectContext(command.input, config) : command.input
+    const input = toolId === 'track_project_progress' ? resolveProjectContext(command.input, { projects: stored.records, ...config }) : command.input
     const evaluation = run({ input })
     evaluation.result.audit = { ...evaluation.result.audit, evaluated_by: command.actor }
     res.status(evaluation.result.status === 'not_calculable' ? 400 : 200).json(evaluation)

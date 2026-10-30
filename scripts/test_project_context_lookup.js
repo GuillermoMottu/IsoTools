@@ -101,6 +101,31 @@ try {
   const explicitNull = await run({ projectId: 'QA-PRJ-ISO', actual_progress_percent: null })
   assert.equal(explicitNull.status, 400, 'explicit invalid facts are not replaced by configured values')
   assert.deepEqual(app.consumer.snapshot(), state, 'API evaluation does not publish or move the consumer cursor')
+  app.stop()
+  server.closeAllConnections()
+  await new Promise(resolve => server.close(resolve))
+  app = await createToolApp({ TOOL_PAGE_ID: toolId, TOOL_STATE_DIR: path.join(temp, 'consumer'), WEB_DIST_DIR: path.join(temp, 'absent-dist') })
+  server = http.createServer(app.app)
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const cachedState = app.consumer.snapshot()
+  const cached = await fetch(`http://127.0.0.1:${server.address().port}/api/tool/${toolId}/run`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': 'fixture-project-machine-key' }, body: '{"input":{"projectId":"QA-PRJ-ISO"}}' })
+  assert.equal(cached.status, 200, 'persisted project context works without a config file')
+  assert.equal((await cached.json()).result.status, 'at_risk')
+  assert.deepEqual(app.consumer.snapshot(), cachedState)
+  const nextRow = { ...row, seq: 2, event_id: 'fixture-cached-update', data: { projectId: 'QA-PRJ-ISO', actualProgressPercent: 15 } }
+  const resumed = await createToolConsumer({ toolId, apiUrl: 'https://fixture.invalid', apiKey: 'fixture-central-key', stateDir: path.join(temp, 'consumer'), logger: () => {}, fetcher: async (url, options) => {
+    if (options.method === 'POST') {
+      const output = JSON.parse(options.body)
+      assert.equal(output.data.status, 'delayed')
+      assert.equal(output.metadata.test, true, 'cached test context keeps test lineage')
+      return Response.json({ status: 'accepted', event_id: output.event_id }, { status: 201 })
+    }
+    return Response.json({ consumer: toolId, consumes: ['KPI_REPORT_GENERATED'], events: [nextRow], next_seq: 2 })
+  } })
+  assert.equal((await resumed.tick()).status, 'ready')
+  assert.equal(resumed.snapshot().cursor, 2)
+  assert.equal(resumed.snapshot().last_evaluation.result.status, 'delayed')
+  assert.deepEqual(resumed.snapshot().records['QA-PRJ-ISO'].source.source_record_ids, [nextRow.event_id, row.event_id], 'cached context retains its source event alongside the new trigger')
   console.log('Project context lookup: projectId-only API/consumer/replay, alias precedence, missing/invalid context, test lineage and no API publications PASS')
 } finally {
   app?.stop()
