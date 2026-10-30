@@ -2,6 +2,8 @@
 
 Alcance: `compare_planned_vs_actual` y `track_project_progress`, para el escenario 7 de PR-ORCA-ENS-001 v1.3. Las otras tools conservan sus responsables.
 
+Actualización de alcance: el proyecto está en desarrollo. Los desarrolladores crean y prueban los datos de ensayo y el líder valida las convenciones compartidas y el cierre del checklist. La ausencia de datos empresariales definitivos no bloquea las pruebas locales. Los fixtures y la matriz de responsabilidades vigentes están en [Validación de desarrollo CPA/TPP](DESARROLLO_CPA_TPP.md); la evidencia de eventos guardados que sigue se conserva como resultado histórico.
+
 ## Estado del 29 de octubre de 2026
 
 La [inspección 40831459970](https://github.com/GuillermoMottu/IsoTools/actions/runs/40831459970) confirmó que Railway conservaba key central válida, variables SSO completas, consumidores habilitados y volúmenes persistentes. La imagen servida no correspondía al servidor propio de las tools.
@@ -107,10 +109,10 @@ Un job exitoso acredita que la consulta terminó. No significa que CPA o TPP hay
 
 ## Pendientes propios
 
-1. Proporcionar la organización real y acordar la meta y contexto del ensayo cuando corresponda.
-2. Disponer de entradas guardadas con la procedencia y el contexto requeridos; si faltan, registrar esa dependencia en el contrato sin implementar otra tool.
-3. Completar las pruebas de permisos con cuentas reales autorizadas. Login humano, deep link y logout ya están comprobados; la lectura sin rol fue rechazada. No se probó una operación de negocio con esa cuenta.
-4. Revisar los resultados del replay y la configuración histórica antes de aprobar los PV de nuestras tools.
+1. Acordar con el líder el uso compartido de los identificadores y metas de desarrollo ya preparados y probados. No requiere crear una organización empresarial definitiva.
+2. Coordinar con los desarrolladores del conector ERP y generate_kpis las entradas guardadas de desarrollo con contexto completo. Los fixtures locales ya están listos; no se implementaron las otras tools.
+3. Repetir los permisos con cuentas Logto después de que el líder o desarrollador administrador asigne y emita los roles. La matriz local de ambas tools ya pasó; login humano, deep link, logout y rechazo de lectura sin rol ya estaban comprobados.
+4. Ejecutar el replay con las nuevas entradas guardadas y presentar al líder la evidencia de los PV de nuestras tools. La key limitada a events:read requiere intervención del administrador del core/Actions.
 
 ## Validación
 

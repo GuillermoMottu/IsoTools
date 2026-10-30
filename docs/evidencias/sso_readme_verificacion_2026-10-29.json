@@ -1,0 +1,66 @@
+{
+  "checked_at": "2026-10-30T04:34:13.720Z",
+  "execution": "GET_only_public_surfaces_and_isolated_startup",
+  "remote_changes": false,
+  "node": "v24.22.1",
+  "tools": [
+    {
+      "tool": "compare_planned_vs_actual",
+      "origin": "https://cpa.orcalabs.mx",
+      "health_status": 200,
+      "health_identity_matches": true,
+      "auth": "sso",
+      "build_sha": "5dd8fb199636c51053a10055da508b4a659cf400",
+      "ready_status": 200,
+      "anonymous_api_status": 401,
+      "anonymous_api_json": true,
+      "anonymous_api_error": "authentication_required",
+      "api_sets_cors_allow_origin": false,
+      "anonymous_deep_link_status": 302,
+      "deep_link_destination_preserved": true,
+      "login_status": 302,
+      "login_provider_matches": true,
+      "login_requests_roles": true,
+      "login_pkce_s256": true,
+      "bundle": {
+        "frontend_bundle_checked": true,
+        "frontend_key_leak": false,
+        "frontend_actual_key_checked": false,
+        "frontend_actual_client_secret_checked": false,
+        "frontend_actual_session_secret_checked": true,
+        "actual_tool_key_compared": true,
+        "scope": "public_manifest_entry_js_css_only"
+      },
+      "actual_process_rejects_missing_session_secret": true
+    },
+    {
+      "tool": "track_project_progress",
+      "origin": "https://tpp.orcalabs.mx",
+      "health_status": 200,
+      "health_identity_matches": true,
+      "auth": "sso",
+      "build_sha": "5dd8fb199636c51053a10055da508b4a659cf400",
+      "ready_status": 200,
+      "anonymous_api_status": 401,
+      "anonymous_api_json": true,
+      "anonymous_api_error": "authentication_required",
+      "api_sets_cors_allow_origin": false,
+      "anonymous_deep_link_status": 302,
+      "deep_link_destination_preserved": true,
+      "login_status": 302,
+      "login_provider_matches": true,
+      "login_requests_roles": true,
+      "login_pkce_s256": true,
+      "bundle": {
+        "frontend_bundle_checked": true,
+        "frontend_key_leak": false,
+        "frontend_actual_key_checked": false,
+        "frontend_actual_client_secret_checked": false,
+        "frontend_actual_session_secret_checked": true,
+        "actual_tool_key_compared": true,
+        "scope": "public_manifest_entry_js_css_only"
+      },
+      "actual_process_rejects_missing_session_secret": true
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+--- a/src/data/platform/deployments.json
++++ b/src/data/platform/deployments.json
+@@ -181,10 +181,14 @@
+       "status": "live",
+       "subdomain": "cpa",
+       "localPort": 8106,
+-      "owner": "pendiente de asignar",
++      "owner": "Guillermo Mottu",
+       "isoClause": "9.1.1",
+       "summary": "Compara el plan contra lo ejecutado por periodo y publica la varianza.",
+-      "note": "Servicio en Railway, verificado con GET https://cpa.orcalabs.mx/health -> 200. El router DELEGA y ya no ejecuta src/tools/compare_planned_vs_actual.js, que queda como referencia del contrato: el ERP aporta el real (campo `actual` de ERP_SALES_PERIOD_CLOSED) y la META la pone el servicio — la constante METAS del handler es solo el ejemplo. OJO con el modo de falla: la delegacion se decide por URL resoluble, NO por que el servicio responda, asi que el fallback no es un failover. Si cpa se cae, ERP_SALES_PERIOD_CLOSED sigue entrando al log y a su suscripcion (no se pierde nada, lo lee al volver desde su cursor) pero la cascada de direccion se queda muda mientras tanto: generate_kpis, detect_business_anomalies y track_project_progress dejan de recibir."
++      "note": "Servicio en Railway, verificado con GET https://cpa.orcalabs.mx/health -> 200. El router DELEGA y ya no ejecuta src/tools/compare_planned_vs_actual.js, que queda como referencia del contrato: el ERP aporta el real (campo `actual` de ERP_SALES_PERIOD_CLOSED) y la META la pone el servicio — la constante METAS del handler es solo el ejemplo. OJO con el modo de falla: la delegacion se decide por URL resoluble, NO por que el servicio responda, asi que el fallback no es un failover. Si cpa se cae, ERP_SALES_PERIOD_CLOSED sigue entrando al log y a su suscripcion (no se pierde nada, lo lee al volver desde su cursor) pero la cascada de direccion se queda muda mientras tanto: generate_kpis, detect_business_anomalies y track_project_progress dejan de recibir.",
++      "requiredRoles": [
++        "operations.manager",
++        "platform.auditor"
++      ]
+     },
+     {
+       "toolId": "generate_kpis",
+@@ -200,9 +204,13 @@
+       "kind": "federated",
+       "status": "live",
+       "subdomain": "tpp",
+-      "owner": "pendiente de asignar",
++      "owner": "Guillermo Mottu",
+       "isoClause": "6.2",
+-      "note": "Servicio en Railway, verificado con GET https://tpp.orcalabs.mx/health -> 200. El router DELEGA y ya no ejecuta su handler de src/tools/, que queda como referencia del contrato."
++      "note": "Servicio en Railway, verificado con GET https://tpp.orcalabs.mx/health -> 200. El router DELEGA y ya no ejecuta su handler de src/tools/, que queda como referencia del contrato.",
++      "requiredRoles": [
++        "operations.manager",
++        "platform.auditor"
++      ]
+     },
+     {
+       "toolId": "automate_followups",

@@ -82,6 +82,7 @@ jobs:
           node scripts/test_railway_preparation.js
           node scripts/test_runbook_deployed_auth.js
           node scripts/test_runbook_consumer.js
+          node scripts/test_tools_development.js
           node scripts/test_project_context_lookup.js
           node scripts/test_runbook_runtime.js
           node scripts/test_tool_service.js
@@ -174,6 +175,7 @@ jobs:
           node scripts/test_railway_preparation.js
           node scripts/test_runbook_deployed_auth.js
           node scripts/test_runbook_consumer.js
+          node scripts/test_tools_development.js
           node scripts/test_project_context_lookup.js
           node scripts/test_runbook_runtime.js
           node scripts/test_tool_service.js

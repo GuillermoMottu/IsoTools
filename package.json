@@ -6,6 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
+    "test:tools:desarrollo": "node scripts/test_tools_development.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "lint": "eslint .",
