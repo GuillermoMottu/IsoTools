@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { inspectConsumerBacklog } from './inspect_railway_tool.js'
+import { inspectConsumerBacklog, inspectErpConnectorStatus } from './inspect_railway_tool.js'
 
 const tool = 'compare_planned_vs_actual'
 const variables = { TOOL_API_KEY: 'fixture-tool-key-not-for-core', ISOTOOLS_API_KEY: 'fixture-core-key-not-for-tool' }
@@ -39,3 +39,18 @@ for (const scenario of ['empty', 'pending', 'advancing', 'unauthorized', 'bad_or
 assert.equal((await inspectConsumerBacklog({}, tool, async () => assert.fail('no request without credentials'))).status, 'requires_credentials')
 await assert.rejects(inspectConsumerBacklog(variables, 'other_tool'), /invalid_tool/)
 console.log('Consumer backlog: GET-only, separate credentials, durable cursor observation, pending/empty subscriptions, concurrent progress and sanitized output PASS')
+const erp = await inspectErpConnectorStatus(variables, async (url, options) => {
+  assert.equal(url, 'https://api-events.orcalabs.mx/api/v1/connectors/erp_microsip')
+  assert.equal(options.method, 'GET')
+  assert.equal(options.redirect, 'error')
+  assert.equal(options.headers['x-api-key'], variables.ISOTOOLS_API_KEY)
+  return Response.json({ id: 'erp_microsip', enabled: true, source: 'private-gateway-never-print', consecutiveFailures: 3, state: [{ last_status: 'error', last_error: 'private-error-never-print', last_run_at: '2026-10-30T06:00:00Z', cursor: 'private-erp-cursor' }] })
+})
+assert.equal(erp.status, 'observed')
+assert.equal(erp.states_with_error, 1)
+assert.deepEqual(erp.state_statuses, ['error'])
+assert.equal(erp.last_recorded_run_at, '2026-10-30T06:00:00.000Z')
+assert.equal(JSON.stringify(erp).includes('private-'), false)
+assert.equal((await inspectErpConnectorStatus(variables, async () => Response.json({}, { status: 403 }))).status, 'unverified')
+assert.equal((await inspectErpConnectorStatus({}, async () => assert.fail('no key'))).status, 'requires_credentials')
+console.log('ERP status: GET-only, fixed connector endpoint and sanitized state/error summary PASS')

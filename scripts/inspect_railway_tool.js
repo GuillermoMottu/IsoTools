@@ -137,6 +137,28 @@ export async function inspectConsumerBacklog (variables, toolId, fetcher = fetch
   return report
 }
 
+export async function inspectErpConnectorStatus (variables, fetcher = fetch) {
+  const report = { status: 'requires_credentials', methods: ['GET'], connector_changed: false }
+  if (typeof variables.ISOTOOLS_API_KEY !== 'string' || !variables.ISOTOOLS_API_KEY.trim()) return report
+  try {
+    const response = await fetcher(`${CENTRAL_API}/connectors/erp_microsip`, { method: 'GET', headers: { 'x-api-key': variables.ISOTOOLS_API_KEY }, redirect: 'error', signal: AbortSignal.timeout(15000) })
+    report.http_status = response.status
+    if (!response.ok) throw new Error('read_failed')
+    const connector = await response.json()
+    if (connector.id !== 'erp_microsip' || !Array.isArray(connector.state)) throw new Error('invalid_connector')
+    const dates = connector.state.map(row => Date.parse(row.last_run_at)).filter(Number.isFinite)
+    Object.assign(report, {
+      status: 'observed', enabled: connector.enabled === true, running: connector.running === true,
+      consecutive_failures: Number.isSafeInteger(connector.consecutiveFailures) ? connector.consecutiveFailures : null,
+      state_rows: connector.state.length,
+      states_with_error: connector.state.filter(row => Boolean(row.last_error)).length,
+      state_statuses: [...new Set(connector.state.map(row => row.last_status).filter(status => ['ok', 'partial', 'error'].includes(status)))],
+      last_recorded_run_at: dates.length ? new Date(Math.max(...dates)).toISOString() : null
+    })
+  } catch { report.status = 'unverified' }
+  return report
+}
+
 export function stateDirectoryIsPersistent (volumeList, service, stateDirectory = '/data') {
   if (!Array.isArray(volumeList.volumes)) throw new Error('invalid_volume_response')
   return volumeList.volumes.some(volume => volume.serviceName === service && !volume.isPendingDeletion && !volume.deletedAt &&
@@ -273,6 +295,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     } catch { throw new Error('railway_variables_query_failed') }
     const report = await inspectConnection(variables, process.env.TOOL_PAGE_ID, process.env.HEALTH_URL)
     report.backlog = await inspectConsumerBacklog(variables, process.env.TOOL_PAGE_ID)
+    if (process.env.TOOL_PAGE_ID === 'compare_planned_vs_actual') report.erp_connector = await inspectErpConnectorStatus(variables)
     if (report.health_url) Object.assign(report, await inspectFrontendBundle(variables, report.health_url))
     try {
       const volumeList = railwayJson(['volume', '--service', process.env.RAILWAY_SERVICE, 'list', '--json'])
