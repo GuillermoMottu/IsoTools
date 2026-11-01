@@ -27,6 +27,17 @@ Informes: tests-node24.json, tests-node22-verified.json, audit-runtime.json, aud
 
 ## Entrega
 
-Implementado, validado localmente y publicado en nuestro fork como [86eb927](https://github.com/GuillermoMottu/IsoTools/commit/86eb927). La revision automatica rechazo el comando de despliegue antes de ejecutarlo: la autorizacion explicita anterior cubria la correccion OIDC del callback, no este paquete completo de autenticacion, validacion y dependencias. Se requiere autorizacion expresa para desplegar este paquete en CPA/TPP.
+Implementado como [86eb927](https://github.com/GuillermoMottu/IsoTools/commit/86eb927) y desplegado en CPA y TPP con la revision 2862cefc37ba75f258268e595f695bb64a09db99, tras la autorizacion explicita del usuario. El [workflow de despliegue 41269893796](https://github.com/GuillermoMottu/IsoTools/actions/runs/41269893796) termino success para ambas tools, con los preflight aprobados y los jobs de publicacion QA/replay skipped.
 
-El servicio publicado sigue en 006d260665cd36d7eb437c0bd7ed630eefa84adb; no se aplica aun este endurecimiento. No se cambiaron configuracion o consumidores al intentar el despliegue. Antes y despues de desplegar se compararan la identidad del build, salud, disponibilidad, hashes de registros, cursores y rechazos, sin iniciar sesion en Logto. Las nuevas trazas permiten observar solicitudes futuras; no reconstruyen el incidente anterior ni prueban que hayamos sido su causa.
+## Verificacion de los servicios desplegados
+
+- /health y /ready: 200, modo SSO y revision esperada en ambos servicios. /auth/me sin sesion: 401 sin redireccion.
+- Callback sin handshake: 400 AUTH_LOGIN_EXPIRED, sin redireccion y con request ID. La inspeccion de logs encontro ese mismo request ID con http_status=400 en cada servicio: las trazas funcionan en Railway.
+- En cada API de evaluacion se envio un fixture completo con cantidades booleanas: 400/not_calculable. El fixture numerico valido devolvio 200/deviation en CPA y 200/at_risk en TPP. Son credenciales de servicio y datos sinteticos; no acreditan permisos humanos ni una cadena ERP historica.
+- El hash del estado completo del consumidor fue identico antes y despues del despliegue y de las evaluaciones. CPA conserva cursor 7679, dos registros y cero rechazos. TPP conserva cursor 7684, tres registros y cuatro rechazos anteriores. Sin publicaciones pendientes ni entradas posteriores al cursor.
+- Claves de servicio y central operativas, consumidores activos, volumen persistente y assets efectivos sin las claves/client secret/session secret inspeccionados. Fuente GitHub desconectada en ambos servicios; no se cambio el core ni main.
+- Los limites y la pausa del proveedor se comprobaron con fixtures locales; no se generaron rafagas ni nuevos intentos contra Logto en los servicios reales. No se publico ningun evento central durante esta entrega.
+
+Evidencia: [antes](evidencias/endurecimiento_41269893796_antes.json), [evaluaciones y estado despues](evidencias/endurecimiento_41269893796_despues.json) e [inspeccion final](evidencias/endurecimiento_41270098282_inspeccion.json). La [inspeccion 41270098282](https://github.com/GuillermoMottu/IsoTools/actions/runs/41270098282) termino success en ambas tools.
+
+El desbloqueo de Logto y la sesion humana con operations.manager siguen sin verificarse. Las nuevas trazas permiten observar solicitudes futuras; no reconstruyen el incidente anterior ni prueban que hayamos sido su causa. El aviso moderado del tooling heredado no forma parte del runtime desplegado.

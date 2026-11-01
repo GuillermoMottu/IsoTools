@@ -1,0 +1,66 @@
+{
+  "workflow": "https://github.com/GuillermoMottu/IsoTools/actions/runs/41269893796",
+  "deployed_sha": "2862cefc37ba75f258268e595f695bb64a09db99",
+  "logto_login_attempts": 0,
+  "central_event_posts": 0,
+  "tools": [
+    {
+      "tool": "compare_planned_vs_actual",
+      "health_http": 200,
+      "ready_http": 200,
+      "auth": "sso",
+      "callback_http": 400,
+      "callback_error": "AUTH_LOGIN_EXPIRED",
+      "callback_redirect": null,
+      "callback_request_id": "89f0e24a-9d0d-462e-86d3-65be4b6f37ab",
+      "anonymous_session_http": 401,
+      "evaluations": [
+        {
+          "case": "invalid_numeric",
+          "http_status": 400,
+          "result": "not_calculable"
+        },
+        {
+          "case": "valid_fixture",
+          "http_status": 200,
+          "result": "deviation"
+        }
+      ],
+      "cursor": 7679,
+      "records_count": 2,
+      "rejected_count": 0,
+      "records_sha256": "8314ad171208c5b4bd9416948eb20c891a60ad239616fa46833668bcb8459416",
+      "state_sha256": "ee9ee376d04afd9e09adc680f36379ad9dd574bb682f5b4c7ab482e2011950bf",
+      "state_preserved": true
+    },
+    {
+      "tool": "track_project_progress",
+      "health_http": 200,
+      "ready_http": 200,
+      "auth": "sso",
+      "callback_http": 400,
+      "callback_error": "AUTH_LOGIN_EXPIRED",
+      "callback_redirect": null,
+      "callback_request_id": "a411eb20-391c-4604-8a37-0d713af8cad1",
+      "anonymous_session_http": 401,
+      "evaluations": [
+        {
+          "case": "invalid_numeric",
+          "http_status": 400,
+          "result": "not_calculable"
+        },
+        {
+          "case": "valid_fixture",
+          "http_status": 200,
+          "result": "at_risk"
+        }
+      ],
+      "cursor": 7684,
+      "records_count": 3,
+      "rejected_count": 4,
+      "records_sha256": "a90d7d3de7ac51f5afca322f534f218cd309c6860967541f47f26738a7aa198d",
+      "state_sha256": "7be0917ec07aff795df06b099f59b823fc3ac6291f96e2f15ea26fa4efc86a7b",
+      "state_preserved": true
+    }
+  ]
+}

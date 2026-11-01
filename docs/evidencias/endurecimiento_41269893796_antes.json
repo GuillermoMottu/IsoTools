@@ -1,0 +1,26 @@
+{
+  "workflow": "https://github.com/GuillermoMottu/IsoTools/actions/runs/41269893796",
+  "phase": "before_deployment",
+  "tools": [
+    {
+      "tool": "compare_planned_vs_actual",
+      "build_sha": "006d260665cd36d7eb437c0bd7ed630eefa84adb",
+      "cursor": 7679,
+      "records_count": 2,
+      "records_sha256": "8314ad171208c5b4bd9416948eb20c891a60ad239616fa46833668bcb8459416",
+      "state_sha256": "ee9ee376d04afd9e09adc680f36379ad9dd574bb682f5b4c7ab482e2011950bf",
+      "rejected_count": 0,
+      "publication_pending": false
+    },
+    {
+      "tool": "track_project_progress",
+      "build_sha": "006d260665cd36d7eb437c0bd7ed630eefa84adb",
+      "cursor": 7684,
+      "records_count": 3,
+      "records_sha256": "a90d7d3de7ac51f5afca322f534f218cd309c6860967541f47f26738a7aa198d",
+      "state_sha256": "7be0917ec07aff795df06b099f59b823fc3ac6291f96e2f15ea26fa4efc86a7b",
+      "rejected_count": 4,
+      "publication_pending": false
+    }
+  ]
+}
