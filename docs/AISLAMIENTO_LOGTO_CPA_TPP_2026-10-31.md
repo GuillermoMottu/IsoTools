@@ -8,7 +8,7 @@ El modo isolate de deploy-tools.yml exige confirm_pause=true y comparte el bloqu
 
 Antes de cualquier parada se verifican las dos identidades, salud/disponibilidad, volumen persistente, estado sin publicacion pendiente, revision servida, IDs de despliegue exactos y canRedeploy=true. El plan contiene IDs y hashes/cantidades; no claves o registros empresariales. Se sube como evidencia de recuperacion antes de detener los procesos.
 
-Se consulta una vez el endpoint publico de autorizacion desde el ejecutor de Actions, sin cookies y sin seguir redirecciones. Si no devuelve 429, se omite la pausa. Si devuelve 429, se detienen exclusivamente los despliegues identificados mediante deploymentStop, se confirma que ya no estan en SUCCESS ni sirven health, se espera un minuto y se repite una sola consulta al proveedor.
+Se consulta una vez el endpoint publico de autorizacion desde el ejecutor de Actions, sin cookies y sin seguir redirecciones. Si no devuelve 429, se omite la pausa. Si devuelve 429, se detienen exclusivamente los despliegues identificados mediante deploymentStop. Se exige el acuse true del control y dos observaciones consecutivas sin health disponible en ambos servicios, se espera un minuto y se repite una sola consulta al proveedor. El campo historico status del despliegue no se usa como prueba unica de que su proceso esta detenido.
 
 Se restauran los despliegues originales mediante deploymentRedeploy. No se cambia configuracion, codigo servido, credenciales, volumen, estado, registro central ni cursor. Se exige que el nuevo despliegue de recuperacion alcance SUCCESS y que health/ready y la revision esperada respondan; no basta una respuesta del proceso anterior durante su drenaje.
 
@@ -24,4 +24,4 @@ Un 429 con ambas tools efectivamente detenidas demostraria que sus procesos acti
 
 ## Estado
 
-Preparado y probado localmente; aun no ejecutado contra Railway al crear este documento.
+La primera ejecucion 41273905560 no completo la comprobacion formal de parada y activo la restauracion. Ambas tools quedaron restauradas desde los mismos despliegues, con health/ready 200 y hashes completos de estado identicos. La consulta local del periodo de interrupcion devolvio 429. No se declara esa primera ejecucion como ensayo completo; se ajusta la comprobacion para registrar acuse y disponibilidad y se prepara una repeticion.

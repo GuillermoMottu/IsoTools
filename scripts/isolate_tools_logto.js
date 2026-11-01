@@ -165,16 +165,32 @@ async function main (mode) {
   const result = await runIsolation(plan.entries, {
     probe: async phase => { const value = await providerProbe(); plan[`${phase}_probe`] = value; await save(plan); console.log(JSON.stringify({ stage: phase, ...value })); return value },
     mark: async entry => { entry.stop_requested = true; await save(plan) },
-    stop: async entry => { const target = definitions.find(candidate => candidate.tool === entry.tool); console.log(JSON.stringify({ stage: 'stop', tool: entry.tool })); await control(target, 'mutation($id: String!) { deploymentStop(id: $id) }', { id: entry.deployment_id }) },
+    stop: async entry => {
+      const target = definitions.find(candidate => candidate.tool === entry.tool)
+      console.log(JSON.stringify({ stage: 'stop', tool: entry.tool }))
+      const result = await control(target, 'mutation($id: String!) { deploymentStop(id: $id) }', { id: entry.deployment_id })
+      if (result.deploymentStop !== true) throw new Error('stop_not_acknowledged')
+      entry.stop_acknowledged = true
+      await save(plan)
+    },
     confirmStopped: async () => {
+      let consecutive = 0
       await waitFor(async () => {
+        let allDown = true
         for (const target of definitions) {
-          try { if ((await fetch(`${target.origin}/health`, { redirect: 'manual', signal: AbortSignal.timeout(5000) })).ok) return false } catch {}
           const entry = plan.entries.find(candidate => candidate.tool === target.tool)
-          const { deployment } = await control(target, 'query($id: String!) { deployment(id: $id) { id status } }', { id: entry.deployment_id })
-          if (deployment.status === 'SUCCESS') return false
+          if (!entry.stop_acknowledged) throw new Error('stop_not_acknowledged')
+          const observation = { at: new Date().toISOString(), http_status: null }
+          try {
+            const response = await fetch(`${target.origin}/health`, { redirect: 'manual', signal: AbortSignal.timeout(5000) })
+            observation.http_status = response.status
+            if (response.ok) allDown = false
+          } catch { observation.unavailable = true }
+          entry.stop_health_observations = [...(entry.stop_health_observations || []), observation].slice(-10)
         }
-        return true
+        consecutive = allDown ? consecutive + 1 : 0
+        await save(plan)
+        return consecutive >= 2
       }, 90000)
       plan.pause_confirmed_at = new Date().toISOString()
       await save(plan)
@@ -188,5 +204,9 @@ async function main (mode) {
   console.log(JSON.stringify({ stage: 'complete', result }))
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main(process.argv[2]).catch(() => { console.error('isolation_step_failed_check_plan_and_restore'); process.exitCode = 1 })
+  main(process.argv[2]).catch(error => {
+    const codes = ['verification_timeout', 'railway_control_unavailable', 'railway_control_rejected', 'restoration_requires_attention', 'restored_state_requires_review', 'stop_not_acknowledged', 'preflight_state_changed', 'recoverable_deployment_required', 'wrong_tool_configuration', 'tool_unavailable']
+    console.error(codes.includes(error.message) ? error.message : 'isolation_step_failed_check_plan_and_restore')
+    process.exitCode = 1
+  })
 }
