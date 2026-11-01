@@ -105,9 +105,15 @@ export function createAuthGateway (config) {
     const jar = parseCookies(req.headers.cookie);
     const handshake = verifyValue(jar[HANDSHAKE_COOKIE], config.sessionSecret);
     if (!handshake || typeof handshake.exp !== 'number' || handshake.exp <= nowSeconds()) {
-      // Sin handshake usable: el login tardo demasiado o el callback se reprodujo.
-      // Se empieza de nuevo en vez de dar detalle que alguien pueda sondear.
-      return redirect(res, '/auth/login');
+      // If the browser cannot retain the handshake cookie, restarting here loops
+      // through the IdP indefinitely. Stop and require an explicit new login.
+      res.set('cache-control', 'no-store');
+      res.setHeader('set-cookie', [clearCookie(HANDSHAKE_COOKIE, config.secureCookies, HANDSHAKE_PATH)]);
+      return res.status(400).json({
+        error: 'AUTH_LOGIN_EXPIRED',
+        message: 'El inicio de sesion vencio o no pudo validarse. Inicia sesion de nuevo.',
+        login_url: '/auth/login'
+      });
     }
 
     const asConfig = await discover();

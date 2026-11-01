@@ -4,6 +4,7 @@ import { generateKeyPairSync, sign, createHash } from 'node:crypto'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { signValue } from '../src/tool-auth/signed-value.js'
 
 const track = process.argv.includes('--track')
 const toolId = track ? 'track_project_progress' : 'compare_planned_vs_actual'
@@ -16,7 +17,7 @@ const temp = await mkdtemp(path.join(os.tmpdir(), 'isotools-oidc-'))
 const originalFetch = globalThis.fetch
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'fixture-rsa', alg: 'RS256', use: 'sig' }
-let mode = 'valid', idpRoles = ['operations.manager'], authorization, tokenCalls = 0
+let mode = 'valid', idpRoles = ['operations.manager'], authorization, tokenCalls = 0, discoveryCalls = 0
 let tool
 const server = http.createServer((req, res) => tool.app(req, res))
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -25,7 +26,10 @@ Object.assign(process.env, { NODE_ENV: 'test', OIDC_ISSUER: '', OIDC_CLIENT_ID: 
 globalThis.fetch = async (url, options) => {
   const parsed = new URL(typeof url === 'string' ? url : url.url || url.href)
   if (parsed.origin !== issuer) return originalFetch(url, options)
-  if (parsed.pathname.endsWith('/.well-known/openid-configuration')) return Response.json({ issuer, authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks`, response_types_supported: ['code'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'], token_endpoint_auth_methods_supported: ['client_secret_post'], code_challenge_methods_supported: ['S256'] })
+  if (parsed.pathname.endsWith('/.well-known/openid-configuration')) {
+    discoveryCalls++
+    return Response.json({ issuer, authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks`, response_types_supported: ['code'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'], token_endpoint_auth_methods_supported: ['client_secret_post'], code_challenge_methods_supported: ['S256'] })
+  }
   if (parsed.pathname === '/jwks') return Response.json({ keys: [jwk] })
   assert.equal(parsed.pathname, '/token')
   tokenCalls++
@@ -35,6 +39,7 @@ globalThis.fetch = async (url, options) => {
   assert.equal(body.get('redirect_uri'), `${base}/auth/callback`)
   assert.equal(createHash('sha256').update(body.get('code_verifier')).digest('base64url'), authorization.searchParams.get('code_challenge'), 'real PKCE verifier matches S256 challenge')
   if (mode === 'invalid_code') return Response.json({ error: 'invalid_grant' }, { status: 400 })
+  if (mode === 'rate_limited') return Response.json({ error: 'temporarily_unavailable' }, { status: 429, headers: { 'retry-after': '60' } })
   const now = Math.floor(Date.now() / 1000)
   const claims = { iss: mode === 'wrong_issuer' ? 'https://other.invalid' : issuer, aud: mode === 'wrong_audience' ? 'other-client' : clientId, sub: 'verified-user', name: 'Fixture operator', roles: idpRoles, nonce: mode === 'wrong_nonce' ? 'other-nonce' : authorization.searchParams.get('nonce'), iat: now, exp: mode === 'expired' ? now - 60 : now + 600 }
   const payload = [Buffer.from(JSON.stringify({ alg: 'RS256', kid: jwk.kid })).toString('base64url'), Buffer.from(JSON.stringify(claims)).toString('base64url')].join('.')
@@ -70,6 +75,18 @@ try {
   const unauthenticated = await originalFetch(base + recordPath, { redirect: 'manual' })
   assert.equal(unauthenticated.status, 401)
   assert.equal((await unauthenticated.json()).error, 'authentication_required')
+  const beforeInvalidHandshake = tokenCalls
+  for (const cookie of ['', 'oidc_handshake=invalid', `oidc_handshake=${signValue({ exp: Math.floor(Date.now() / 1000) - 1 }, secret)}`]) {
+    const invalid = await originalFetch(`${base}/auth/callback?code=fixture-code&state=fixture-state`, { redirect: 'manual', headers: { cookie } })
+    assert.equal(invalid.status, 400, 'unusable handshake must stop instead of restarting login')
+    assert.equal(invalid.headers.get('location'), null)
+    assert.equal(invalid.headers.get('cache-control'), 'no-store')
+    assert.equal((await invalid.json()).error, 'AUTH_LOGIN_EXPIRED')
+    assert.ok(invalid.headers.getSetCookie().some(value => value.startsWith('oidc_handshake=') && value.includes('Max-Age=0')))
+    assert.ok(!invalid.headers.getSetCookie().some(value => value.startsWith(`${cookieName}=`)))
+  }
+  assert.equal(tokenCalls, beforeInvalidHandshake, 'invalid handshake never reaches token exchange')
+  assert.equal(discoveryCalls, 0, 'invalid handshake never contacts IdP discovery')
   const completed = await login()
   assert.equal(completed.status, 302)
   assert.equal(completed.headers.get('location'), '/deep/link?x=1')
@@ -89,17 +106,23 @@ try {
   const beforeWrongState = tokenCalls
   assert.equal((await login('wrong-state')).status, 502)
   assert.equal(tokenCalls, beforeWrongState, 'state rejection happens before code exchange')
-  for (mode of ['wrong_nonce', 'wrong_issuer', 'wrong_audience', 'expired', 'bad_signature', 'invalid_code']) {
+  for (mode of ['wrong_nonce', 'wrong_issuer', 'wrong_audience', 'expired', 'bad_signature', 'invalid_code', 'rate_limited']) {
+    const previousCalls = tokenCalls
     const invalid = await login()
     assert.equal(invalid.status, 502, mode)
+    assert.equal(invalid.headers.get('location'), null, 'provider errors must not restart login')
+    assert.equal(tokenCalls, previousCalls + 1, 'one code exchange, without automatic retries')
     assert.ok(!invalid.headers.getSetCookie().some(value => value.startsWith(`${cookieName}=`)), mode)
   }
   mode = 'valid'
   for (idpRoles of [['platform.auditor'], ['unknown.admin'], []]) {
     const signedIn = await login()
+    assert.equal(signedIn.status, 302)
+    assert.equal(signedIn.headers.get('location'), '/deep/link?x=1', 'a missing role does not restart login')
     const cookie = cookies(signedIn)
     const request = await originalFetch(`${base}/api/tool/${toolId}/run`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: '{"input":{},"authorizedByRole":"OperationsManager"}' })
     assert.equal(request.status, 403, 'IdP role controls permission; body cannot grant it')
+    assert.equal(request.headers.get('location'), null, 'permission denial must not redirect to Logto')
   }
   console.log(`${toolId}: real OIDC library discovery, PKCE, RSA/JWKS, state/nonce/issuer/audience/expiry/signature checks, callback/deep link, logout and roles PASS (local IdP fixture)`)
 } finally {
