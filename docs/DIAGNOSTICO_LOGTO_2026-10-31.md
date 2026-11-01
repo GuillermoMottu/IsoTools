@@ -19,7 +19,18 @@ Las regresiones OIDC de ambas tools comprueban esos tres casos, un intercambio d
 
 El cambio se limita al gateway de nuestras tools. El gateway del core y la plantilla original no se modifican.
 
-Estado de entrega: pruebas locales OIDC y configuracion aprobadas en Node 24.22.1. Tras un rechazo inicial de la revision automatica, el usuario autorizo expresamente publicar y desplegar esta correccion en CPA y TPP el 31 de octubre. Se conserva el estado previo en evidencias/oidc_antibucle_2026-10-31_antes.json; el despliegue y su comprobacion quedan en curso al publicar este diagnostico.
+Estado de entrega: publicado y desplegado en CPA y TPP como 006d260665cd36d7eb437c0bd7ed630eefa84adb. Tras un rechazo inicial de la revision automatica, el usuario autorizo expresamente este despliegue el 31 de octubre. El [workflow 41263685369](https://github.com/GuillermoMottu/IsoTools/actions/runs/41263685369) termino success en ambos jobs. Las pruebas locales pasaron en Node 24.22.1 y los preflight del workflow en Node 22. Los jobs de replay y publicacion QA quedaron skipped.
+
+## Comprobacion del despliegue
+
+Las consultas directas a ambos servicios verificaron health y ready HTTP 200, modo SSO y el SHA esperado. GET /auth/callback sin cookie devolvio 400 AUTH_LOGIN_EXPIRED, sin Location, con cache-control no-store y borrado de la cookie de handshake. No se siguieron redirecciones ni se inicio sesion en Logto.
+
+| Tool | Cursor antes/despues | Registros | Rechazos conservados | Estado |
+| --- | --- | --- | --- | --- |
+| CPA | 7679 / 7679 | 2 | 0 | Hash de registros identico, sin publicacion pendiente. |
+| TPP | 7684 / 7684 | 3 | 4 | Hash de registros identico, sin publicacion pendiente. |
+
+Se verifico ademas que las claves de servicio existentes siguen funcionando y que /auth/me sin sesion mantiene 401 sin redireccion. Evidencias sanitizadas: [antes](evidencias/oidc_antibucle_2026-10-31_antes.json) y [despues](evidencias/oidc_antibucle_2026-10-31_despues.json). Estos resultados no prueban el desbloqueo del proveedor ni la asignacion efectiva del rol en una sesion nueva.
 
 ## Seguimiento
 
