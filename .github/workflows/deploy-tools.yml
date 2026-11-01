@@ -24,6 +24,11 @@ on:
           - deploy
           - validate
           - replay
+          - isolate
+      confirm_pause:
+        description: Permit a bounded CPA/TPP pause with automatic restoration for Logto isolation
+        type: boolean
+        default: false
       activate_consumer:
         description: Activate registered consumers for new events (no historical replay)
         type: boolean
@@ -271,3 +276,53 @@ jobs:
           REPLAY_ORGANIZATION_ID: ${{ vars.ISOTOOLS_ORGANIZATION_ID || '' }}
           TOOL_SELECTED: ${{ inputs.tool }}
         run: node scripts/replay_tools_readonly.js
+
+  isolate_logto:
+    name: Isolate CPA and TPP with automatic restoration
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'isolate' && inputs.confirm_pause == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      COMPARE_RAILWAY_TOKEN: ${{ secrets.RAILWAY_COMPARE_TOKEN || secrets.RAILWAY_TOKEN }}
+      TRACK_RAILWAY_TOKEN: ${{ secrets.RAILWAY_TRACK_TOKEN || secrets.RAILWAY_TOKEN }}
+      COMPARE_SERVICE: ${{ vars.COMPARE_PLANNED_VS_ACTUAL_RAILWAY_SERVICE || 'compare-planned-vs-actual' }}
+      TRACK_SERVICE: ${{ vars.TRACK_PROJECT_PROGRESS_RAILWAY_SERVICE || 'track-project-progress' }}
+      CONFIRM_ISOLATION: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install existing dependencies and Railway CLI
+        run: |
+          corepack enable
+          pnpm install --prod --frozen-lockfile
+          npm install -g @railway/cli@5.67.1
+      - name: Test restoration safety with fixtures
+        run: node scripts/test_tools_isolation.js
+      - name: Verify exact targets, persistent volumes and recoverable deployments
+        run: node scripts/isolate_tools_logto.js plan
+      - name: Preserve recovery plan before stopping anything
+        uses: actions/upload-artifact@v7
+        with:
+          name: tool-isolation-recovery-plan
+          path: .tool-isolation/plan.json
+          include-hidden-files: true
+      - name: Temporarily stop tools, probe once after quiet window, restore
+        run: node scripts/isolate_tools_logto.js isolate
+      - name: Restore any deployment still marked as stopped
+        if: ${{ always() }}
+        run: |
+          if [ -f .tool-isolation/plan.json ]; then
+            node scripts/isolate_tools_logto.js restore
+          fi
+      - name: Preserve sanitized isolation result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tool-isolation-result
+          path: .tool-isolation/plan.json
+          include-hidden-files: true
+          if-no-files-found: warn
