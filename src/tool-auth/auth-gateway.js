@@ -16,6 +16,8 @@
 // Requiere: npm i openid-client@^6   (Node 20+)
 // -----------------------------------------------------------------------------
 import * as oidc from 'openid-client';
+import { randomUUID } from 'node:crypto';
+import { createLoginProtection } from './login-protection.js';
 import {
   buildCookie,
   clearCookie,
@@ -37,22 +39,45 @@ const HANDSHAKE_PATH = '/auth';
 // fallaria su healthcheck y quedaria en reinicio perpetuo. En vez de eso arranca,
 // sirve /health, y los logins fallan hasta que el discovery funcione: degradacion,
 // no caida.
-export function createAuthGateway (config) {
+export function createAuthGateway (config, { now = Date.now, logger = entry => console.log(JSON.stringify(entry)) } = {}) {
   let discovered = null;
+  let unavailableUntil = 0;
+  const admitLogin = createLoginProtection(now);
+  const instanceId = randomUUID();
+  const buildSha = /^[a-f0-9]{40}$/.test(process.env.TOOL_BUILD_SHA || '') ? process.env.TOOL_BUILD_SHA : null;
+  const retryAfter = () => Math.max(0, Math.ceil((unavailableUntil - now()) / 1000));
+
+  async function providerFetch (...args) {
+    if (retryAfter()) throw new Error('AUTH_COOLDOWN');
+    try {
+      const response = await fetch(...args);
+      if (response.status === 429 || response.status >= 500) {
+        const raw = response.headers.get('retry-after');
+        const seconds = raw && /^\d+$/.test(raw) ? Number(raw) : raw ? (Date.parse(raw) - now()) / 1000 : 30;
+        const wait = Number.isFinite(seconds) ? Math.min(3600, Math.max(30, seconds)) : 30;
+        unavailableUntil = Math.max(unavailableUntil, now() + wait * 1000);
+      }
+      return response;
+    } catch (error) {
+      unavailableUntil = Math.max(unavailableUntil, now() + 30000);
+      throw error;
+    }
+  }
 
   async function discover () {
+    if (retryAfter()) throw new Error('AUTH_COOLDOWN');
     if (!discovered) {
       discovered = oidc
-        .discovery(config.issuer, config.clientId, config.clientSecret)
+        .discovery(config.issuer, config.clientId, config.clientSecret, undefined, { [oidc.customFetch]: providerFetch })
         .then((asConfig) => {
           // openid-client otherwise relies on TLS for tokens received from the token endpoint.
           oidc.enableNonRepudiationChecks(asConfig);
           return asConfig;
         })
         .catch((error) => {
-          // Suelta la promesa rechazada para que el siguiente request reintente en
-          // vez de cachear el fallo para siempre.
+          // A failed discovery may be retried only after the local cooldown.
           discovered = null;
+          unavailableUntil = Math.max(unavailableUntil, now() + 30000);
           throw error;
         });
     }
@@ -116,6 +141,8 @@ export function createAuthGateway (config) {
       });
     }
 
+    const limited = admitLogin(`callback:${req.ip || 'unknown'}`);
+    if (limited) return res.set('retry-after', String(limited)).status(429).json({ error: 'AUTH_RATE_LIMITED', retry_after_seconds: limited });
     const asConfig = await discover();
     const currentUrl = new URL(req.originalUrl || req.url || '/', config.redirectUri);
     // La libreria verifica el state, el enlace PKCE y, del ID token, la firma, el
@@ -156,6 +183,9 @@ export function createAuthGateway (config) {
       clearCookie(config.sessionCookieName, config.secureCookies),
       clearCookie(HANDSHAKE_COOKIE, config.secureCookies, HANDSHAKE_PATH)
     ]);
+    if (retryAfter()) return res.json({ logged_out: true, message: 'Sesion local cerrada; proveedor temporalmente no disponible.' });
+    const limited = admitLogin(`logout:${req.ip || 'unknown'}`);
+    if (limited) return res.set('retry-after', String(limited)).status(429).json({ error: 'AUTH_RATE_LIMITED', logged_out: true, retry_after_seconds: limited });
 
     // Logout iniciado por la RP, best effort: si el IdP no responde ya borramos la
     // sesion local, asi que el usuario queda fuera de TU tool de todas formas.
@@ -184,10 +214,25 @@ export function createAuthGateway (config) {
     },
 
     async handleRoute (req, res, action) {
+      const started = now();
+      const requestId = randomUUID();
+      const phase = ['login', 'callback', 'logout'].includes(action) ? action : 'unknown';
+      res.set('x-request-id', requestId);
+      res.set('cache-control', 'no-store');
+      res.once('finish', () => logger({
+        component: 'tool_auth', action: phase, request_id: requestId,
+        instance_id: instanceId, build_sha: buildSha,
+        http_status: res.statusCode, duration_ms: Math.max(0, now() - started)
+      }));
       try {
         switch (action) {
-          case 'login':
+          case 'login': {
+            const wait = retryAfter();
+            if (wait) return res.set('retry-after', String(wait)).status(503).json({ error: 'AUTH_COOLDOWN', retry_after_seconds: wait });
+            const limited = admitLogin(`login:${req.ip || 'unknown'}`);
+            if (limited) return res.set('retry-after', String(limited)).status(429).json({ error: 'AUTH_RATE_LIMITED', retry_after_seconds: limited });
             return await startLogin(req, res, safeReturnTo(req.query?.return_to));
+          }
           case 'callback':
             return await completeLogin(req, res);
           case 'logout':
@@ -196,9 +241,10 @@ export function createAuthGateway (config) {
             return res.status(404).json({ error: 'not_found' });
         }
       } catch (error) {
-        // Nunca se exponen las tripas del IdP al navegador; el detalle va al log
-        // para quien opera.
-        console.error(`[auth] /auth/${action} fallo:`, error.message);
+        // Log only the allowlisted completion fields above; provider errors may
+        // contain request details. Never log codes, cookies, bodies or tokens.
+        const wait = retryAfter();
+        if (wait) return res.set('retry-after', String(wait)).status(503).json({ error: 'AUTH_COOLDOWN', retry_after_seconds: wait });
         return res.status(502).json({
           error: 'AUTH_UNAVAILABLE',
           message: 'proveedor de identidad no disponible'

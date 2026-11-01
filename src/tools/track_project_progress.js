@@ -1,4 +1,5 @@
 import { isMilestoneOverdue } from '../utils/projectMilestones.js'
+import { isFiniteNumeric } from '../utils/numericValue.js'
 // src/tools/track_project_progress.js
 // Plan de implementacion gestionado por hitos de clausula. isoEvent: "project_progress_update".
 
@@ -133,7 +134,7 @@ function getValidationWarnings (input) {
   }
   for (const field of ['planned_progress_percent', 'actual_progress_percent']) {
     const value = input[field]
-    if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 100)) {
+    if (value !== undefined && (!isFiniteNumeric(value) || Number(value) < 0 || Number(value) > 100)) {
       warnings.push(`${field} must be between 0 and 100`)
     }
   }
@@ -183,11 +184,10 @@ function evaluateMilestones (milestones = [], asOfDate) {
 
 function calculateBudgetUsedPercent (budget, warnings) {
   if (!budget) return null
-  const validAmount = value => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value))
-  const plannedAmount = Number(budget.planned_amount)
-  const actualAmount = Number(budget.actual_amount)
+  const plannedAmount = isFiniteNumeric(budget.planned_amount) ? Number(budget.planned_amount) : NaN
+  const actualAmount = isFiniteNumeric(budget.actual_amount) ? Number(budget.actual_amount) : NaN
   const usedPercent = (actualAmount / plannedAmount) * 100
-  if (!validAmount(budget.planned_amount) || !validAmount(budget.actual_amount) || plannedAmount <= 0 || actualAmount < 0 || !Number.isFinite(usedPercent)) {
+  if (!Number.isFinite(plannedAmount) || !Number.isFinite(actualAmount) || plannedAmount <= 0 || actualAmount < 0 || !Number.isFinite(usedPercent)) {
     warnings.push('budget requires planned_amount > 0 and non-negative finite actual_amount')
     return null
   }

@@ -24,7 +24,7 @@ export async function createToolApp (env = process.env) {
   })
   const app = express()
   app.set('trust proxy', 1)
-  app.use(express.json({ limit: '1mb' }))
+  app.use(express.json({ limit: '1mb', inflate: false }))
   app.get('/health', (req, res) => res.json({ status: 'ok', service: 'isotools-tool', tool: toolId, auth: authMode, build_sha: env.TOOL_BUILD_SHA || null }))
   app.get('/ready', (req, res) => {
     const status = enabled ? consumer.readiness() : { status: 'not_ready', reason: 'consumer_disabled' }
@@ -62,7 +62,11 @@ export async function createToolApp (env = process.env) {
     app.use(express.static(dist, { index: false }))
     app.get(/.*/, requireBrowserSession, (req, res) => res.set('cache-control', 'no-store').sendFile(path.join(dist, 'index.html')))
   }
-  app.use((error, req, res, next) => res.status(error.status === 400 ? 400 : 500).json({ error: error.status === 400 ? 'invalid_json' : 'tool_request_failed' }))
+  app.use((error, req, res, next) => {
+    const errors = { 400: 'invalid_json', 413: 'payload_too_large', 415: 'unsupported_content_encoding' }
+    const status = Object.hasOwn(errors, error.status) ? error.status : 500
+    res.status(status).json({ error: errors[status] || 'tool_request_failed' })
+  })
   let stopped = false
   let timer
   async function poll () {

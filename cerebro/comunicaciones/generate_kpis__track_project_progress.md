@@ -58,6 +58,7 @@ tags: [comunicacion, KPI_REPORT_GENERATED]
 ```
 
 ## Bitacora de la comunicacion
+- [2026-10-31] (codex) Endurece la validacion de porcentajes/presupuesto conforme al contrato existente: rechaza booleanos, espacios y estructuras antes de convertir. Se conservan numeros y strings decimales validos; sin cambios de evento, fuente o regla de disparo.
 
 - [2026-10-30] (codex) El adaptador de TPP usa por defecto los proyectos ya conservados en su propio estado; projects explícito en configuración sustituye esa fuente. Pruebas de API y consumo tras reinicio mantienen prioridades, marca test y cursor. El replay continúa sin acceder al volumen desplegado.
 

@@ -2,6 +2,7 @@
 // Objetivos vs ejecucion (gap analysis y Revision por Direccion). isoEvent: "production_variance_report".
 
 import { projectFields } from '../utils/projectContext.js'
+import { isFiniteNumeric } from '../utils/numericValue.js'
 
 const CALCULATION_VERSION = '1.0.0'
 const RULE_VERSION = '1.0.0'
@@ -151,7 +152,7 @@ function adversePercentForDirection (planned, actual, direction) {
 
 function metricWeight (metric, warnings) {
   if (metric.weight === undefined) return 1
-  const weight = Number(metric.weight)
+  const weight = isFiniteNumeric(metric.weight) ? Number(metric.weight) : NaN
   if (!Number.isFinite(weight) || weight < 0) {
     warnings.push('weight must be a non-negative finite number; defaulted to 1')
     return 1
@@ -183,8 +184,8 @@ function calculateMetric (metric, index, thresholds) {
     }
   }
 
-  const planned = Number(metric.planned)
-  const actual = Number(metric.actual)
+  const planned = isFiniteNumeric(metric.planned) ? Number(metric.planned) : NaN
+  const actual = isFiniteNumeric(metric.actual) ? Number(metric.actual) : NaN
 
   if (!Number.isFinite(planned) || !Number.isFinite(actual)) {
     return {

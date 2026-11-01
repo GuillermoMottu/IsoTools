@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { gzipSync, deflateSync } from 'node:zlib'
 import { createToolConsumer, salesInput, subscriptionEvent } from '../src/services/toolConsumer.js'
 import { resolveAuthConfig } from '../src/tool-auth/oidc-config.js'
 import { signSession, buildCookie } from '../src/tool-auth/session-cookie.js'
@@ -28,6 +29,13 @@ try {
   const { app, stop } = await createToolApp(appEnv)
   const base = await listen(http.createServer(app))
   assert.equal((await fetch(`${base}/health`)).status, 200)
+  for (const [encoding, compress] of [['gzip', gzipSync], ['deflate', deflateSync]]) {
+    const encoded = Buffer.concat([compress(Buffer.from('{"input":{}}')), Buffer.from('invalid-trailing-bytes')])
+    const rejected = await fetch(`${base}/api/tool/${toolId}/run`, { method: 'POST', headers: { 'content-type': 'application/json', 'content-encoding': encoding }, body: encoded })
+    assert.equal(rejected.status, 415, 'encoded bodies are rejected before creating a decoder')
+    assert.equal((await rejected.json()).error, 'unsupported_content_encoding')
+    assert.equal((await fetch(`${base}/health`)).status, 200)
+  }
   assert.equal((await fetch(`${base}/ready`)).status, 503)
   assert.equal((await fetch(`${base}/api/absent`)).status, 404)
   const unauthorized = await fetch(`${base}/api/tool/status`, { redirect: 'manual' })

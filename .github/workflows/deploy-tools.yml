@@ -78,6 +78,8 @@ jobs:
           corepack enable
           pnpm install --prod --frozen-lockfile
           node scripts/test_sso_configuration.js
+          node scripts/test_auth_protection.js
+          node scripts/test_data_quality.js
           node scripts/test_railway_inspection.js
           node scripts/test_railway_preparation.js
           node scripts/test_runbook_deployed_auth.js
@@ -173,6 +175,8 @@ jobs:
           corepack enable
           pnpm install --prod --frozen-lockfile
           node scripts/test_sso_configuration.js
+          node scripts/test_auth_protection.js
+          node scripts/test_data_quality.js
           node scripts/test_railway_inspection.js
           node scripts/test_railway_preparation.js
           node scripts/test_runbook_deployed_auth.js

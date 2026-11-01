@@ -79,6 +79,7 @@ Aliases de compatibilidad:
 - _ninguna declarada_
 
 ## Bitacora de cambios
+- [2026-10-31] (codex) Rechaza booleanos, espacios y estructuras en cantidades; conserva strings decimales validos. Sin meta sigue preservando el hecho ERP sin inventar organizacion, pero ya no oculta una fecha invalida. Regresiones y endurecimiento de acceso en docs/CORRECCIONES_CPA_TPP_2026-10-31.md.
 <!-- Anota aqui cada cambio de contrato/logica que pueda afectar a otras tools.
      Formato sugerido:  - [YYYY-MM-DD] (tu-nombre) que cambio y a quien afecta -->
 - [2026-06-28] (auto) nota inicial generada desde la configuracion.

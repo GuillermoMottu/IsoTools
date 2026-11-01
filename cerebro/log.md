@@ -7,6 +7,10 @@ updated: 2026-06-28
 
 Registro cronológico de cambios significativos en el vault. Una línea por evento.
 
+## [2026-10-31] Proteccion de CPA/TPP y datos invalidos
+
+- Cuotas de autenticacion, pausa ante errores del proveedor y trazas de campos permitidos; dependencias de runtime/cliente actualizadas y cuerpos comprimidos rechazados antes de decodificar. Valida tipos numericos y no oculta fechas invalidas con sin_meta. Se rectifica el hallazgo de organizacion: el contrato ERP permite conservar ese hecho sin inventar identidad. Sin cambios de tipos de evento ni publicaciones historicas.
+
 ## [2026-10-30] Contexto persistido de TPP
 - La API y el consumidor TPP resuelven projectId desde sus registros conservados cuando no hay un registro projects explícito; las referencias de los eventos y las marcas de prueba se mantienen. Ver comunicaciones/generate_kpis__track_project_progress.
 

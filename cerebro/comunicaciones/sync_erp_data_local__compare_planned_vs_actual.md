@@ -32,6 +32,7 @@ El productor ERP local de esta rama no implementa todavía el cierre de ventas d
 la integración productiva depende del productor desplegado por el equipo de conexión.
 
 ## Bitácora de la comunicación
+- [2026-10-31] (codex) Sin meta mantiene el contrato que permite organizacion pendiente sin inventarla. Se impide que ese estado oculte fechas/configuracion invalidas; valores numericos mal tipados se rechazan. No cambia el esquema ni se reproducen entradas historicas.
 
 - [2026-10-13] (codex) Resuelto registro de ambas URLs en core. Activación 38506459810: consumidores Railway activos, ready 200, inicio en últimos cursores sin replay histórico. QA 38506668863 fue consumida por los servicios desplegados: registro visible, salida 201 y cadena verificada. No acredita datos empresariales reales ni reinicio del volumen.
 

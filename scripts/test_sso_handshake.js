@@ -47,8 +47,9 @@ globalThis.fetch = async (url, options) => {
   return Response.json({ access_token: 'fixture-access-token', token_type: 'Bearer', expires_in: 600, id_token: `${payload}.${mode === 'bad_signature' ? `${signature.slice(0, -8)}AAAAAAAA` : signature}` })
 }
 const cookies = response => response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+let loginClient = 0
 async function login (stateOverride) {
-  const start = await originalFetch(`${base}/auth/login?return_to=${encodeURIComponent('/deep/link?x=1')}`, { redirect: 'manual' })
+  const start = await originalFetch(`${base}/auth/login?return_to=${encodeURIComponent('/deep/link?x=1')}`, { redirect: 'manual', headers: { 'x-forwarded-for': `192.0.2.${++loginClient}` } })
   assert.equal(start.status, 302)
   authorization = new URL(start.headers.get('location'))
   assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256')
@@ -56,7 +57,7 @@ async function login (stateOverride) {
   assert.match(handshake, /HttpOnly/)
   assert.match(handshake, /Secure/)
   assert.match(handshake, /Path=\/auth/)
-  return originalFetch(`${base}/auth/callback?code=fixture-code&state=${encodeURIComponent(stateOverride || authorization.searchParams.get('state'))}`, { redirect: 'manual', headers: { cookie: cookies(start) } })
+  return originalFetch(`${base}/auth/callback?code=fixture-code&state=${encodeURIComponent(stateOverride || authorization.searchParams.get('state'))}`, { redirect: 'manual', headers: { cookie: cookies(start), 'x-forwarded-for': `192.0.2.${loginClient}` } })
 }
 try {
   await mkdir(process.env.WEB_DIST_DIR)
@@ -106,7 +107,7 @@ try {
   const beforeWrongState = tokenCalls
   assert.equal((await login('wrong-state')).status, 502)
   assert.equal(tokenCalls, beforeWrongState, 'state rejection happens before code exchange')
-  for (mode of ['wrong_nonce', 'wrong_issuer', 'wrong_audience', 'expired', 'bad_signature', 'invalid_code', 'rate_limited']) {
+  for (mode of ['wrong_nonce', 'wrong_issuer', 'wrong_audience', 'expired', 'bad_signature', 'invalid_code']) {
     const previousCalls = tokenCalls
     const invalid = await login()
     assert.equal(invalid.status, 502, mode)
@@ -124,6 +125,14 @@ try {
     assert.equal(request.status, 403, 'IdP role controls permission; body cannot grant it')
     assert.equal(request.headers.get('location'), null, 'permission denial must not redirect to Logto')
   }
+  mode = 'rate_limited'
+  const beforeLimit = tokenCalls
+  const limited = await login()
+  assert.equal(limited.status, 503)
+  assert.equal(limited.headers.get('location'), null)
+  assert.equal(limited.headers.get('retry-after'), '60')
+  for (let i = 0; i < 3; i++) assert.equal((await originalFetch(`${base}/auth/login`, { redirect: 'manual' })).status, 503)
+  assert.equal(tokenCalls, beforeLimit + 1, 'provider cooldown prevents new exchanges or login redirects')
   console.log(`${toolId}: real OIDC library discovery, PKCE, RSA/JWKS, state/nonce/issuer/audience/expiry/signature checks, callback/deep link, logout and roles PASS (local IdP fixture)`)
 } finally {
   globalThis.fetch = originalFetch

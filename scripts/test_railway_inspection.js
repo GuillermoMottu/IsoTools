@@ -112,6 +112,7 @@ const ops = inspectRailwayOperations('compare_planned_vs_actual', 'compare-plann
     JSON.stringify({ message: JSON.stringify({ tool: 'compare_planned_vs_actual', action: 'published', input_seq: 8, http_status: 201, event_id: 'never-print-fixture-secret' }) }),
     JSON.stringify({ message: '', tool: 'compare_planned_vs_actual', action: 'processed', seq: 9, secret: 'never-print-fixture-secret' }),
     JSON.stringify({ message: 'null' }),
+    JSON.stringify({ component: 'tool_auth', action: 'callback', request_id: '11111111-1111-4111-8111-111111111111', http_status: 400, duration_ms: 1, cookie: 'never-print-fixture-secret', message: '' }),
     JSON.stringify({ message: JSON.stringify({ tool: 'other_tool', action: 'retry' }) }),
     'unstructured private log never-print-fixture-secret'
   ].join('\n')
@@ -119,7 +120,8 @@ const ops = inspectRailwayOperations('compare_planned_vs_actual', 'compare-plann
 assert.equal(ops.latest_deployment_status, 'SUCCESS')
 assert.equal(ops.runtime_log_queries_succeeded, true)
 assert.deepEqual(ops.observed_log_actions, ['poll', 'processed', 'published'])
-assert.equal(ops.runtime_json_logs_read, 10)
+assert.equal(ops.runtime_json_logs_read, 12)
+assert.deepEqual(ops.auth_log_samples, [{ action: 'callback', request_id: '11111111-1111-4111-8111-111111111111', http_status: 400, duration_ms: 1 }])
 assert.ok(ops.runtime_log_samples.some(sample => sample.action === 'processed' && sample.seq === 9))
 assert.equal(JSON.stringify(ops).includes('never-print-fixture-secret'), false)
 assert.ok(operationCalls.every(args => ['deployment', 'logs'].includes(args[0]) && !args.includes('redeploy') && !args.includes('set')))

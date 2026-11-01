@@ -77,6 +77,10 @@ export function evaluateConsumerInput (toolId, event, input) {
   const result = TOOL_CONTRACTS[toolId].evaluate({ ...event, data: input })
   // ERP_CENTRAL: preserve the actual even when no approved sales target exists.
   if (toolId !== 'compare_planned_vs_actual' || Array.isArray(event.data.metrics) || input.metrics[0].planned !== null) return result
+  // The ERP contract permits an unassigned organization for a fact without a
+  // target. It must not hide other invalid fields, dates or configuration.
+  if (result.data_quality.missing_fields.some(field => !['organization_id', 'metrics[0].planned'].includes(field)) ||
+      result.data_quality.warnings.length > 0 || typeof input.as_of_date !== 'string' || Number.isNaN(Date.parse(input.as_of_date))) return result
   return {
     ...result,
     module: 'sales',

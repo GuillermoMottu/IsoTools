@@ -1,0 +1,234 @@
+{
+  "date_local": "2026-10-31",
+  "production_published_events": 0,
+  "logto_login_attempts": 0,
+  "node24": {
+    "node": "v24.22.1",
+    "tests": [
+      {
+        "test": "test_auth_protection.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_compare_planned_vs_actual.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_consumer_backlog.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_data_quality.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_deployment_source.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_frontend_erp.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_frontend_evaluation.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_frontend_explanations.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_frontend_history.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_frontend_values.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_kpi_project_contract.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_project_context_lookup.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_project_milestones.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_project_switch.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_railway_inspection.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_railway_preparation.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_readonly_replay.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_runbook_consumer.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_runbook_deployed_auth.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_runbook_runtime.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_sso_configuration.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_sso_handshake.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_tools_development.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_tool_service.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_track_project_progress.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_sso_handshake.js --track",
+        "status": "PASS"
+      }
+    ],
+    "failed": 0
+  },
+  "node22": {
+    "node": "v22.23.4",
+    "tests": [
+      {
+        "test": "test_auth_protection.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_compare_planned_vs_actual.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_consumer_backlog.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_data_quality.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_deployment_source.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_kpi_project_contract.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_project_context_lookup.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_railway_inspection.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_railway_preparation.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_readonly_replay.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_runbook_consumer.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_runbook_deployed_auth.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_runbook_runtime.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_sso_configuration.js",
+        "status": "PASS",
+        "setup_note": "Initial reference-template mount was missing; rerun with read-only plantillas mount passed."
+      },
+      {
+        "test": "test_sso_handshake.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_tools_development.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_tool_service.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_track_project_progress.js",
+        "status": "PASS"
+      },
+      {
+        "test": "test_sso_handshake.js --track",
+        "status": "PASS"
+      }
+    ],
+    "failed": 0
+  },
+  "final_numeric_regressions": "PASS after final conversion guard",
+  "images": {
+    "compare": "isotools-compare:security-fixes",
+    "track": "isotools-track:security-fixes",
+    "builds": "PASS",
+    "local_smokes": "PASS"
+  },
+  "audits": {
+    "runtime": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0
+    },
+    "frontend": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "development": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  "lock_hashes": {
+    "pnpm-lock.yaml": "28cdc503e916b5c9aa9c416ffbfc4747c264f5c16302fbe885b8d987d924f7af",
+    "package-lock.json": "d50e3f9599c805c483a267f21b225a9783fc3720c914a3c27e1d89f1f98508d9",
+    "demo-frontend/package-lock.json": "a44a1833dcf41f7b45c19cee1ae459ced8bbcd91956e617c176aa03193a50537"
+  }
+}

@@ -244,7 +244,7 @@ export function railwayJson (args, input) {
 }
 
 export function inspectRailwayOperations (toolId, service, json = railwayJson, raw = railwayText) {
-  const report = { deployment_query_succeeded: false, latest_deployment_status: null, runtime_log_queries_succeeded: false, runtime_log_lines_read: 0, runtime_json_logs_read: 0, observed_log_actions: [], runtime_log_samples: [] }
+  const report = { deployment_query_succeeded: false, latest_deployment_status: null, runtime_log_queries_succeeded: false, runtime_log_lines_read: 0, runtime_json_logs_read: 0, observed_log_actions: [], runtime_log_samples: [], auth_log_samples: [] }
   try {
     const deployments = json(['deployment', 'list', '--service', service, '--limit', '5', '--json'])
     if (!Array.isArray(deployments)) throw new Error('invalid_deployment_list')
@@ -256,7 +256,7 @@ export function inspectRailwayOperations (toolId, service, json = railwayJson, r
   } catch { /* Raw CLI errors may contain credentials. Keep the failed query explicit. */ }
   const actions = new Set()
   try {
-    for (const filter of [null, '@action:published OR @action:processed OR @action:discarded OR @action:retry OR published OR processed OR discarded OR retry']) {
+    for (const filter of [null, '@action:published OR @action:processed OR @action:discarded OR @action:retry OR @component:tool_auth OR published OR processed OR discarded OR retry OR tool_auth']) {
       const output = raw(['logs', '--service', service, '--lines', '100', '--json', ...(filter ? ['--filter', filter] : [])])
       for (const line of output.split(/\r?\n/)) {
         if (!line.trim()) continue
@@ -266,8 +266,17 @@ export function inspectRailwayOperations (toolId, service, json = railwayJson, r
           row = JSON.parse(line)
           report.runtime_json_logs_read++
           // Railway may flatten structured JSON fields into log attributes.
-          entry = row.tool && row.action ? row : typeof row.message === 'string' ? JSON.parse(row.message) : row
+          entry = (row.tool || row.component === 'tool_auth') && row.action ? row : typeof row.message === 'string' ? JSON.parse(row.message) : row
         } catch { continue }
+        if (entry?.component === 'tool_auth' && ['login', 'callback', 'logout'].includes(entry.action) && /^[a-f0-9-]{36}$/i.test(entry.request_id || '')) {
+          const sample = { action: entry.action, request_id: entry.request_id }
+          for (const name of ['http_status', 'duration_ms']) if (Number.isSafeInteger(entry[name]) && entry[name] >= 0) sample[name] = entry[name]
+          if (/^[a-f0-9-]{36}$/i.test(entry.instance_id || '')) sample.instance_id = entry.instance_id
+          if (/^[a-f0-9]{40}$/i.test(entry.build_sha || '')) sample.build_sha = entry.build_sha
+          if (typeof row.timestamp === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(row.timestamp) && Number.isFinite(Date.parse(row.timestamp))) sample.timestamp = new Date(row.timestamp).toISOString()
+          if (!report.auth_log_samples.some(previous => previous.request_id === sample.request_id)) report.auth_log_samples.push(sample)
+          continue
+        }
         if (!entry || typeof entry !== 'object' || entry.tool !== toolId || !['poll', 'published', 'processed', 'discarded', 'retry', 'duplicate_input', 'duplicate_period'].includes(entry.action)) continue
         actions.add(entry.action)
         const sample = { action: entry.action }
@@ -282,6 +291,7 @@ export function inspectRailwayOperations (toolId, service, json = railwayJson, r
   } catch { /* A log permission or CLI failure is not proof of healthy operation. */ }
   report.observed_log_actions = [...actions].sort()
   report.runtime_log_samples = report.runtime_log_samples.slice(-12)
+  report.auth_log_samples = report.auth_log_samples.slice(-20)
   return report
 }
 
