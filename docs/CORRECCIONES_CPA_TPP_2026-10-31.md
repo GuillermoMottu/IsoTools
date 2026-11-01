@@ -41,3 +41,5 @@ Implementado como [86eb927](https://github.com/GuillermoMottu/IsoTools/commit/86
 Evidencia: [antes](evidencias/endurecimiento_41269893796_antes.json), [evaluaciones y estado despues](evidencias/endurecimiento_41269893796_despues.json) e [inspeccion final](evidencias/endurecimiento_41270098282_inspeccion.json). La [inspeccion 41270098282](https://github.com/GuillermoMottu/IsoTools/actions/runs/41270098282) termino success en ambas tools.
 
 El desbloqueo de Logto y la sesion humana con operations.manager siguen sin verificarse. Las nuevas trazas permiten observar solicitudes futuras; no reconstruyen el incidente anterior ni prueban que hayamos sido su causa. El aviso moderado del tooling heredado no forma parte del runtime desplegado.
+
+Se completo ademas la [prueba de aislamiento](AISLAMIENTO_LOGTO_CPA_TPP_2026-10-31.md): Logto devolvio 429 tras un minuto con las dos tools detenidas. Ambas se restauraron con revision y estado completos identicos. La persistencia del error no requiere que CPA y TPP esten activas en ese momento; no permite atribuir su origen.

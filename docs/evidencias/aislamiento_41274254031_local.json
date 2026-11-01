@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-01T04:46:53.602Z",
+  "tools": [
+    {
+      "origin": "https://cpa.orcalabs.mx",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "origin": "https://tpp.orcalabs.mx",
+      "status": 200,
+      "ok": true
+    }
+  ],
+  "provider": {
+    "skipped": "tools_not_both_unavailable"
+  }
+}

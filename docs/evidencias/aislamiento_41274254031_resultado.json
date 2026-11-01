@@ -1,0 +1,126 @@
+{
+  "created_at": "2026-11-01T04:44:46.173Z",
+  "scope": [
+    "compare_planned_vs_actual",
+    "track_project_progress"
+  ],
+  "entries": [
+    {
+      "tool": "compare_planned_vs_actual",
+      "service_id": "e3638694-09d1-4e56-9060-207657d62b89",
+      "deployment_id": "ccb8f29e-ee59-4e18-8e68-2f459313c4bd",
+      "build_sha": "2862cefc37ba75f258268e595f695bb64a09db99",
+      "before": {
+        "cursor": 7679,
+        "records_count": 2,
+        "rejected_count": 0,
+        "publication_pending": false,
+        "records_sha256": "8314ad171208c5b4bd9416948eb20c891a60ad239616fa46833668bcb8459416",
+        "state_sha256": "ee9ee376d04afd9e09adc680f36379ad9dd574bb682f5b4c7ab482e2011950bf"
+      },
+      "stop_requested": true,
+      "stop_acknowledged": true,
+      "stop_health_observations": [
+        {
+          "at": "2026-11-01T04:44:56.082Z",
+          "http_status": null,
+          "unavailable": true
+        },
+        {
+          "at": "2026-11-01T04:45:09.087Z",
+          "http_status": null,
+          "unavailable": true
+        }
+      ],
+      "restore_deployment_id": "df735fc7-cc00-47bb-b04b-a26e3c0f30bf",
+      "after": {
+        "cursor": 7679,
+        "records_count": 2,
+        "rejected_count": 0,
+        "publication_pending": false,
+        "records_sha256": "8314ad171208c5b4bd9416948eb20c891a60ad239616fa46833668bcb8459416",
+        "state_sha256": "ee9ee376d04afd9e09adc680f36379ad9dd574bb682f5b4c7ab482e2011950bf"
+      },
+      "state_unchanged": true,
+      "restored": true
+    },
+    {
+      "tool": "track_project_progress",
+      "service_id": "4aaafb7e-df3e-487f-93e2-1c525dd80c49",
+      "deployment_id": "ceb1ffaa-b27b-4a7e-a3f6-dd7e36991462",
+      "build_sha": "2862cefc37ba75f258268e595f695bb64a09db99",
+      "before": {
+        "cursor": 7684,
+        "records_count": 3,
+        "rejected_count": 4,
+        "publication_pending": false,
+        "records_sha256": "a90d7d3de7ac51f5afca322f534f218cd309c6860967541f47f26738a7aa198d",
+        "state_sha256": "7be0917ec07aff795df06b099f59b823fc3ac6291f96e2f15ea26fa4efc86a7b"
+      },
+      "stop_requested": true,
+      "stop_acknowledged": true,
+      "stop_health_observations": [
+        {
+          "at": "2026-11-01T04:45:01.083Z",
+          "http_status": null,
+          "unavailable": true
+        },
+        {
+          "at": "2026-11-01T04:45:14.087Z",
+          "http_status": null,
+          "unavailable": true
+        }
+      ],
+      "restore_deployment_id": "66876529-3018-49f6-bd2b-5eb2dd05e5f5",
+      "after": {
+        "cursor": 7684,
+        "records_count": 3,
+        "rejected_count": 4,
+        "publication_pending": false,
+        "records_sha256": "a90d7d3de7ac51f5afca322f534f218cd309c6860967541f47f26738a7aa198d",
+        "state_sha256": "7be0917ec07aff795df06b099f59b823fc3ac6291f96e2f15ea26fa4efc86a7b"
+      },
+      "state_unchanged": true,
+      "restored": true
+    }
+  ],
+  "before_probe": {
+    "at": "2026-11-01T04:44:55.963Z",
+    "status": 429,
+    "headers": {
+      "date": "Sun, 01 Nov 2026 04:44:55 GMT",
+      "content-type": "text/plain;charset=UTF-8",
+      "cf-ray": "a5383f3fd98a28cb-LAX"
+    },
+    "too_many_requests": true,
+    "cookies_sent": false,
+    "redirects_followed": false
+  },
+  "pause_confirmed_at": "2026-11-01T04:45:19.089Z",
+  "paused_probe": {
+    "at": "2026-11-01T04:46:19.468Z",
+    "status": 429,
+    "headers": {
+      "date": "Sun, 01 Nov 2026 04:46:19 GMT",
+      "content-type": "text/plain;charset=UTF-8",
+      "cf-ray": "a5384149efeb2b9c-LAX"
+    },
+    "too_many_requests": true,
+    "cookies_sent": false,
+    "redirects_followed": false
+  },
+  "result": {
+    "paused": {
+      "at": "2026-11-01T04:46:19.468Z",
+      "status": 429,
+      "headers": {
+        "date": "Sun, 01 Nov 2026 04:46:19 GMT",
+        "content-type": "text/plain;charset=UTF-8",
+        "cf-ray": "a5384149efeb2b9c-LAX"
+      },
+      "too_many_requests": true,
+      "cookies_sent": false,
+      "redirects_followed": false
+    }
+  }
+}

@@ -24,4 +24,16 @@ Un 429 con ambas tools efectivamente detenidas demostraria que sus procesos acti
 
 ## Estado
 
-La primera ejecucion 41273905560 no completo la comprobacion formal de parada y activo la restauracion. Ambas tools quedaron restauradas desde los mismos despliegues, con health/ready 200 y hashes completos de estado identicos. La consulta local del periodo de interrupcion devolvio 429. No se declara esa primera ejecucion como ensayo completo; se ajusta la comprobacion para registrar acuse y disponibilidad y se prepara una repeticion.
+La primera ejecucion 41273905560 no completo la comprobacion formal de parada y activo la restauracion. Ambas tools quedaron restauradas desde los mismos despliegues, con health/ready 200 y hashes completos de estado identicos. La consulta local del periodo de interrupcion devolvio 429. No se declara esa primera ejecucion como ensayo completo.
+
+La repeticion [41274254031](https://github.com/GuillermoMottu/IsoTools/actions/runs/41274254031) termino success. Ambas paradas recibieron acuse true y cada servicio tuvo dos comprobaciones de health sin respuesta. La pausa se confirmo a las 04:45:19 UTC del 1 de noviembre (22:45:19 del 31 de octubre, Mexico). Tras 60 segundos sin consultas al proveedor por este ensayo, Logto volvio a responder 429 Too Many Requests a las 04:46:19 UTC, sin Retry-After. La consulta inicial del mismo ejecutor tambien habia respondido 429. Los identificadores CF-Ray quedaron en la evidencia; no identifican por si solos al responsable del limite.
+
+La recuperacion creo los despliegues df735fc7-cc00-47bb-b04b-a26e3c0f30bf (CPA) y 66876529-3018-49f6-bd2b-5eb2dd05e5f5 (TPP), ambos SUCCESS. Se conserva la revision servida 2862cefc37ba75f258268e595f695bb64a09db99. El paso always() termino sin recuperaciones pendientes.
+
+Una verificacion independiente a las 04:47:31 UTC confirmo health/ready 200 y modo SSO en ambas tools. Las APIs y /auth/me rechazan peticiones anonimas con 401. Los hashes completos coinciden exactamente antes y despues: CPA mantiene cursor 7679, dos registros y cero rechazos; TPP cursor 7684, tres registros y cuatro rechazos historicos. Ninguna tiene publicacion pendiente. La consulta local adicional posterior a la recuperacion omitio consultar Logto al encontrar ambas tools disponibles.
+
+Evidencia: [resultado del ejecutor](evidencias/aislamiento_41274254031_resultado.json), [verificacion independiente](evidencias/aislamiento_41274254031_verificacion.json) y [comprobacion local adicional](evidencias/aislamiento_41274254031_local.json).
+
+La [inspeccion final de Railway 41274445012](https://github.com/GuillermoMottu/IsoTools/actions/runs/41274445012) tambien termino success en ambos servicios, sin despliegue. Confirmo consumidores activos, claves centrales aceptadas con HTTP 200, volumen persistente, SSO configurado, assets inspeccionados y cero eventos posteriores al cursor en ambas suscripciones. Los logs consultados despues del reinicio muestran polling; las muestras de autenticacion estan vacias. Esta ventana acotada no demuestra ausencia historica de intentos. [Informe sanitizado](evidencias/aislamiento_41274445012_inspeccion.json).
+
+Conclusion acotada: el bloqueo persistio durante la parada de CPA y TPP. No se sostiene que sus procesos activos sean necesarios para mantener ese 429. El ensayo no identifica la causa, no descarta trafico anterior, otros clientes ni limites de mayor duracion, y no valida la sesion humana con operations.manager. Ambas tools quedan operativas.
