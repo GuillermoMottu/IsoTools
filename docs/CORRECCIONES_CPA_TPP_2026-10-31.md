@@ -27,4 +27,6 @@ Informes: tests-node24.json, tests-node22-verified.json, audit-runtime.json, aud
 
 ## Entrega
 
-Implementado y validado localmente. Publicacion y despliegue pendientes al generar este documento. Antes y despues de desplegar se compararan la identidad del build, salud, disponibilidad, hashes de registros, cursores y rechazos, sin iniciar sesion en Logto. Las nuevas trazas permiten observar solicitudes futuras; no reconstruyen el incidente anterior ni prueban que hayamos sido su causa.
+Implementado, validado localmente y publicado en nuestro fork como [86eb927](https://github.com/GuillermoMottu/IsoTools/commit/86eb927). La revision automatica rechazo el comando de despliegue antes de ejecutarlo: la autorizacion explicita anterior cubria la correccion OIDC del callback, no este paquete completo de autenticacion, validacion y dependencias. Se requiere autorizacion expresa para desplegar este paquete en CPA/TPP.
+
+El servicio publicado sigue en 006d260665cd36d7eb437c0bd7ed630eefa84adb; no se aplica aun este endurecimiento. No se cambiaron configuracion o consumidores al intentar el despliegue. Antes y despues de desplegar se compararan la identidad del build, salud, disponibilidad, hashes de registros, cursores y rechazos, sin iniciar sesion en Logto. Las nuevas trazas permiten observar solicitudes futuras; no reconstruyen el incidente anterior ni prueban que hayamos sido su causa.
