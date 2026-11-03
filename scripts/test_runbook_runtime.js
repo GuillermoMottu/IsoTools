@@ -66,17 +66,31 @@ async function startTool (tool, apiUrl, stateDir) {
   await new Promise(resolve => reservation.close(resolve))
   const child = spawn(process.execPath, [fileURLToPath(new URL('../src/tool-server.js', import.meta.url))], {
     env: {
-      ...process.env, DOTENV_CONFIG_PATH: path.join(temp, 'absent.env'), NODE_ENV: 'production',
-      PORT: new URL(base).port, TOOL_PAGE_ID: tool, TOOL_CONSUMER_ENABLED: 'true',
-      TOOL_STATE_DIR: stateDir, TOOL_INITIAL_CURSOR: '0', TOOL_BUSINESS_CONFIG_FILE: '',
-      ISOTOOLS_API_URL: apiUrl, ISOTOOLS_API_KEY: coreKey, TOOL_API_KEY: toolKey,
-      OIDC_ISSUER: '', OIDC_CLIENT_ID: '', OIDC_CLIENT_SECRET: '',
-      ISSUER_ENDPOINT: 'https://idp.fixture.invalid/oidc', APP_ID: 'runtime-fixture-client', APP_SECRETS: 'runtime-fixture-client-secret',
+      ...process.env,
+      DOTENV_CONFIG_PATH: path.join(temp, 'absent.env'),
+      NODE_ENV: 'production',
+      PORT: new URL(base).port,
+      TOOL_PAGE_ID: tool,
+      TOOL_CONSUMER_ENABLED: 'true',
+      TOOL_STATE_DIR: stateDir,
+      TOOL_INITIAL_CURSOR: '0',
+      TOOL_BUSINESS_CONFIG_FILE: '',
+      ISOTOOLS_API_URL: apiUrl,
+      ISOTOOLS_API_KEY: coreKey,
+      TOOL_API_KEY: toolKey,
+      OIDC_ISSUER: '',
+      OIDC_CLIENT_ID: '',
+      OIDC_CLIENT_SECRET: '',
+      ISSUER_ENDPOINT: 'https://idp.fixture.invalid/oidc',
+      APP_ID: 'runtime-fixture-client',
+      APP_SECRETS: 'runtime-fixture-client-secret',
       OIDC_REDIRECT_URI: 'https://tool.fixture.invalid/auth/callback',
       SESSION_SECRET: 'runtime-fixture-session-secret-at-least-32-characters',
       SESSION_COOKIE_NAME: tool === 'compare_planned_vs_actual' ? 'cpa_session' : 'tpp_session',
-      SESSION_INSECURE_COOKIES: 'false', WEB_DIST_DIR: path.join(temp, 'absent-dist')
-    }, stdio: ['ignore', 'pipe', 'pipe']
+      SESSION_INSECURE_COOKIES: 'false',
+      WEB_DIST_DIR: path.join(temp, 'absent-dist')
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
   })
   children.add(child)
   const running = { child, base, logs: '', errors: '' }
