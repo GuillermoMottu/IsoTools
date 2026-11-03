@@ -1,6 +1,9 @@
 import { healthResponseIsOnline, comparisonPlot } from '../displayValues.js'
-import { cloneElement, isValidElement, useId, useEffect, useState } from 'react'
+import { cloneElement, isValidElement, useId, useEffect, useState, createContext, useContext } from 'react'
 import { AlertTriangle, ArrowLeft, Loader2, LogOut } from 'lucide-react'
+
+const SessionContext = createContext(null)
+export function useToolSession () { return useContext(SessionContext) }
 
 export function AppShell ({
   tool,
@@ -40,7 +43,7 @@ export function AppShell ({
         <div className="service-alert">El servicio no responde. La información se actualizará cuando se restablezca la conexión.</div>
       ) : null}
 
-      <main className="app-main">{children}</main>
+      <main className="app-main"><SessionContext.Provider value={session}>{children}</SessionContext.Provider></main>
     </div>
   )
 }

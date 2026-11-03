@@ -13,7 +13,7 @@ export function evaluationReducer (state, action) {
   return state
 }
 
-export function useToolEvaluation (initialInput, evaluate) {
+export function useToolEvaluation (initialInput, evaluate, { enabled = true, storedResponse = null } = {}) {
   const [state, dispatch] = useReducer(evaluationReducer, null, () => ({ input: initialInput(), response: null, error: '', dirty: false, loading: false, requestId: null }))
   const sequence = useRef(0)
   const busy = useRef(false)
@@ -25,7 +25,7 @@ export function useToolEvaluation (initialInput, evaluate) {
   }
 
   const run = useCallback(async () => {
-    if (busy.current) return
+    if (!enabled || busy.current) return
     busy.current = true
     const id = ++sequence.current
     dispatch({ type: 'start', id })
@@ -37,12 +37,12 @@ export function useToolEvaluation (initialInput, evaluate) {
     } finally {
       if (id === sequence.current) busy.current = false
     }
-  }, [evaluate, state.input])
+  }, [enabled, evaluate, state.input])
 
   useEffect(() => {
-    const cancel = evaluateAfterPause(run)
+    const cancel = enabled ? evaluateAfterPause(run) : () => {}
     return () => { cancel(); sequence.current += 1; busy.current = false }
-  }, [run])
+  }, [run, enabled])
 
   function replaceInput (input, scenario) {
     sequence.current += 1
@@ -54,7 +54,7 @@ export function useToolEvaluation (initialInput, evaluate) {
     busy.current = false
     dispatch({ type: 'undo' })
   }
-  return { ...state, setInput, replaceInput, undo, run }
+  return { ...state, ...(!enabled ? { input: storedResponse?.input || state.input, response: storedResponse, loading: false, error: '' } : {}), setInput, replaceInput, undo, run }
 }
 
 export function evaluateAfterPause (evaluate, delay = 400) {

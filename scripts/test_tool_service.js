@@ -11,6 +11,7 @@ import { resolveAuthConfig } from '../src/tool-auth/oidc-config.js'
 import { signSession, buildCookie } from '../src/tool-auth/session-cookie.js'
 import { mapRoles, DEFAULT_ROLE_MAPPINGS } from '../src/tool-auth/role-mapping.js'
 import { runComparePlannedVsActualTool, runTrackProjectProgressTool } from '../src/services/compareTrackDemoService.js'
+import { storedEvaluation } from '../demo-frontend/src/sessionAccess.js'
 
 const temp = await mkdtemp(path.join(os.tmpdir(), 'isotools-checklist-'))
 const servers = []
@@ -26,7 +27,14 @@ try {
   await writeFile(path.join(dist, 'index.html'), '<html>existing tool</html>')
   const toolId = process.argv.includes('--track') ? 'track_project_progress' : 'compare_planned_vs_actual'
   const appEnv = { TOOL_PAGE_ID: toolId, TOOL_STATE_DIR: path.join(temp, 'app'), WEB_DIST_DIR: dist }
-  const { app, stop } = await createToolApp(appEnv)
+  const sample = toolId === 'compare_planned_vs_actual' ? runComparePlannedVsActualTool({ scenario: 'critical' }) : runTrackProjectProgressTool({ scenario: 'at_risk' })
+  const field = toolId === 'compare_planned_vs_actual' ? 'analysis_id' : 'project_id'
+  const recordId = sample.input[field]
+  if (process.argv.includes('--sso')) {
+    await mkdir(appEnv.TOOL_STATE_DIR)
+    await writeFile(path.join(appEnv.TOOL_STATE_DIR, `${toolId}.json`), JSON.stringify({ cursor: 17, pending: null, records: { [recordId]: sample.input }, evaluations: { [recordId]: sample.result } }))
+  }
+  const { app, stop, consumer: appConsumer } = await createToolApp(appEnv)
   const base = await listen(http.createServer(app))
   assert.equal((await fetch(`${base}/health`)).status, 200)
   for (const [encoding, compress] of [['gzip', gzipSync], ['deflate', deflateSync]]) {
@@ -63,15 +71,24 @@ try {
     assert.equal((await fetch(`${base}${recordsRoute}`, { headers: { cookie: cookie(['OperationsManager']) } })).status, 200)
     assert.equal((await fetch(`${base}${recordsRoute}`, { headers: { cookie: cookie(['OperationsManager']) + 'tampered' } })).status, 401)
     assert.equal((await fetch(`${base}${recordsRoute}`, { headers: { cookie: cookie(['Auditor']) } })).status, 200)
+    const before = appConsumer.snapshot()
+    const storedResponse = await fetch(`${base}/api/tool/status`, { headers: { cookie: cookie(['Auditor']) } })
+    assert.equal(storedResponse.status, 200)
+    assert.equal(storedResponse.headers.get('cache-control'), 'no-store')
+    const snapshot = await storedResponse.json()
+    const saved = storedEvaluation(toolId, snapshot.records[recordId], snapshot.evaluations)
+    assert.deepEqual(saved.result, sample.result)
+    assert.equal(saved.input.as_of_date, sample.input.as_of_date, 'auditor preserves the stored cutoff')
+    assert.deepEqual(appConsumer.snapshot(), before, 'reading the saved result does not change consumer state')
     for (const roles of [[], ['Auditor']]) {
       assert.equal((await fetch(`${base}${runRoute}`, { method: 'POST', headers: { cookie: cookie(roles), 'content-type': 'application/json' }, body: '{"input":{},"authorizedByRole":"OperationsManager"}' })).status, 403)
     }
-    const sample = toolId === 'compare_planned_vs_actual' ? runComparePlannedVsActualTool({ scenario: 'critical' }) : runTrackProjectProgressTool({ scenario: 'at_risk' })
     const evaluation = await fetch(`${base}${runRoute}`, { method: 'POST', headers: { cookie: cookie(['OperationsManager']), 'content-type': 'application/json' }, body: JSON.stringify({ input: sample.input, actor: { subject: 'forged', role: 'Auditor' } }) })
     assert.equal(evaluation.status, 200)
     const result = await evaluation.json()
     assert.deepEqual(result.result.audit.evaluated_by, { subject: 'test-user', role: 'OperationsManager' })
     assert.equal(result.result.status, sample.result.status)
+    assert.deepEqual(appConsumer.snapshot(), before, 'operator evaluation and denied writes preserve consumer state')
     console.log(`SSO local ${toolId}: anonymous 401, no-role 403, auditor read 200/write 403, operator evaluation 200, actor binding, tampered cookie and deep links PASS`)
     stop()
   } else {

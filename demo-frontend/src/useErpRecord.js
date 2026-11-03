@@ -6,12 +6,28 @@ export async function readErpRecords (toolId, fetcher = fetch, signal) {
   const response = await fetcher(project ? '/api/records' : '/api/analyses', { signal, cache: 'no-store', credentials: 'include' })
   if (!response.ok) throw new Error('No se pudieron cargar los datos del ERP')
   const records = await response.json()
+  return validateRecords(records, toolId)
+}
+
+function validateRecords (records, toolId) {
+  const project = toolId === 'track_project_progress'
   if (!records || typeof records !== 'object' || Array.isArray(records)) throw new Error('Respuesta del ERP inv\u00e1lida')
   const field = project ? 'project_id' : 'analysis_id'
   for (const [id, record] of Object.entries(records)) {
     if (!record || typeof record !== 'object' || Array.isArray(record) || record[field] !== id) throw new Error('La referencia del registro ERP no coincide')
   }
   return records
+}
+
+export async function readErpSnapshot (toolId, fetcher = fetch, signal) {
+  // Read records and their persisted evaluations from the same consumer snapshot.
+  const response = await fetcher('/api/tool/status', { signal, cache: 'no-store', credentials: 'include' })
+  if (!response.ok) throw new Error(response.status === 401 ? 'Inicia sesión para consultar los registros.' : response.status === 403 ? 'Tu usuario no tiene permiso para consultar los registros.' : 'No se pudieron cargar los datos del ERP')
+  const snapshot = await response.json()
+  const records = validateRecords(snapshot?.records, toolId)
+  const evaluations = snapshot.evaluations || {}
+  if (typeof evaluations !== 'object' || Array.isArray(evaluations)) throw new Error('Respuesta de evaluaciones inválida')
+  return { records, evaluations }
 }
 
 export function selectErpRecord (records, requested) {
@@ -29,7 +45,7 @@ export function useErpRecord (toolId) {
     window.history.replaceState(null, '', url)
     setRequestedState(id)
   }
-  const [records, setRecords] = useState({})
+  const [{ records, evaluations }, setSnapshot] = useState({ records: {}, evaluations: {} })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   useEffect(() => {
@@ -37,14 +53,14 @@ export function useErpRecord (toolId) {
     let timer
     async function refresh () {
       try {
-        const next = await readErpRecords(toolId, fetch, controller.signal)
+        const next = await readErpSnapshot(toolId, fetch, controller.signal)
         if (!controller.signal.aborted) {
-          setRecords(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
+          setSnapshot(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
           setError('')
-          if (Object.keys(next).length === 0) setRequested('')
+          if (Object.keys(next.records).length === 0) setRequested('')
         }
       } catch (error) {
-        if (!controller.signal.aborted) { setRecords({}); setError(error.message) }
+        if (!controller.signal.aborted) { setSnapshot({ records: {}, evaluations: {} }); setError(error.message) }
       } finally {
         if (!controller.signal.aborted) { setLoading(false); timer = setTimeout(refresh, 5000) }
       }
@@ -53,7 +69,7 @@ export function useErpRecord (toolId) {
     return () => { controller.abort(); clearTimeout(timer) }
   }, [toolId])
   const record = selectErpRecord(records, requested)
-  return { record, records, requested, setRequested, loading, error }
+  return { record, records, evaluations, requested, setRequested, loading, error }
 }
 
 export function erpSummary (records, toolId) {

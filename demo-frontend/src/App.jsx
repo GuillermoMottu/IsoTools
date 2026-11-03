@@ -17,12 +17,14 @@ import {
   Tab,
   Table,
   DataRing,
-  ComparisonBars
+  ComparisonBars,
+  useToolSession
 } from './components/controlRoom.jsx'
 import { runComparePlannedVsActual, runTrackProjectProgress, localToday } from './api.js'
 import { useErpRecord } from './useErpRecord.js'
 import { cellError, fieldName, confidenceLabel, warningText, unitLabel, unitCode } from './resultExplanation.js'
 import { useToolEvaluation } from './useToolEvaluation.js'
+import { sessionAccess, storedEvaluation } from './sessionAccess.js'
 import { progressBarWidth } from './visualModels.js'
 import { comparisonDecision, projectDecision, progressDifference, decisionAmount, decisionNumber, decisionDate, recordLabel } from './decisionSummary.js'
 
@@ -148,9 +150,14 @@ function ToolTabs ({ active }) {
 }
 
 function ErpTool ({ tool }) {
-  const { record, records, requested, setRequested, loading, error } = useErpRecord(tool.id)
+  const { record, records, evaluations, requested, setRequested, loading, error } = useErpRecord(tool.id)
+  const session = useToolSession()
+  const { canRead, canEvaluate } = sessionAccess(session)
+  const saved = storedEvaluation(tool.id, record, evaluations)
   const project = tool.id === 'track_project_progress'
   const id = record?.[project ? 'project_id' : 'analysis_id'] || requested
+  if (!session) return <Loading label="Comprobando acceso" />
+  if (!canRead) return <ErrorState title="Acceso no disponible" detail={session.authenticated ? 'Tu cuenta necesita un permiso de consulta para ver estos registros. Solicítalo al administrador.' : 'Inicia sesión para consultar esta información.'} />
   return <div className="page-stack">
     <section className="record-picker" aria-label={project ? 'Proyecto en revisión' : 'Análisis en revisión'}>
       <Field label={project ? 'Seleccionar proyecto' : 'Seleccionar análisis'}>
@@ -163,7 +170,8 @@ function ErpTool ({ tool }) {
       <div className="record-context"><span>{Object.keys(records).length} {project ? 'proyectos disponibles' : 'análisis disponibles'}</span>{record ? <span>{record.test ? 'Datos de prueba · ' : ''}Datos del {erpDate(record.source?.source_extracted_at)}</span> : null}</div>
     </section>
     {loading ? <Loading label="Leyendo registros" /> : error ? <ErrorState title="No se pudieron consultar los registros" detail={error} /> : record
-      ? project ? <TrackPage key={JSON.stringify(record)} tool={tool} initialInput={record} /> : <ComparePage key={JSON.stringify(record)} tool={tool} initialInput={record} />
+      ? !canEvaluate && !saved ? <EmptyState title="Aún no hay una evaluación disponible" detail="Puedes consultar este registro, pero todavía no tiene un resultado guardado válido. Solicita su revisión al responsable de operaciones." />
+        : project ? <TrackPage key={`${canEvaluate}:${JSON.stringify(record)}`} initialInput={record} canEvaluate={canEvaluate} saved={saved} /> : <ComparePage key={`${canEvaluate}:${JSON.stringify(record)}`} initialInput={record} canEvaluate={canEvaluate} saved={saved} />
       : <EmptyState title={Object.keys(records).length === 0 ? project ? 'Aún no hay proyectos' : 'Aún no hay análisis' : requested ? 'Registro no disponible' : 'Selecciona un registro'} detail={Object.keys(records).length === 0 ? 'La información aparecerá cuando se actualicen los datos del ERP.' : requested ? 'La referencia solicitada no está disponible.' : 'Elige un registro para ver su resumen y las prioridades de atención.'} />}
   </div>
 }
@@ -178,8 +186,8 @@ function erpDate (value, dateOnly = false) {
   return new Date(value).toLocaleString('es-MX', dateOnly ? { year: 'numeric', month: '2-digit', day: '2-digit' } : undefined)
 }
 
-function ComparePage ({ initialInput }) {
-  const { input, setInput, response, loading, error } = useToolEvaluation(() => structuredClone(initialInput), runComparePlannedVsActual)
+function ComparePage ({ initialInput, canEvaluate, saved }) {
+  const { input, setInput, response, loading, error } = useToolEvaluation(() => structuredClone(initialInput), runComparePlannedVsActual, { enabled: canEvaluate, storedResponse: saved })
   const result = response?.result
   const decision = useMemo(() => comparisonDecision(result), [result])
   const adjusted = JSON.stringify(input) !== JSON.stringify(initialInput)
@@ -187,7 +195,7 @@ function ComparePage ({ initialInput }) {
   const inRange = decision.metrics.filter(metric => metric.status === 'on_track').length
   const comparable = result && !['sin_meta', 'not_calculable'].includes(result.status) && decision.metrics.length > 0
   return (
-    <ToolPage headline={decision.headline} context={initialInput.domain === 'sales' ? 'Ventas del periodo' : 'Resultados del periodo'} result={result} loading={loading} error={error} adjusted={adjusted} graphic={<DataRing value={comparable ? inRange / decision.metrics.length * 100 : null} display={`${inRange}/${decision.metrics.length}`} label="Indicadores en rango" tone="ok" />}>
+    <ToolPage headline={decision.headline} context={initialInput.domain === 'sales' ? 'Ventas del periodo' : 'Resultados del periodo'} result={result} loading={loading} error={error} adjusted={adjusted} readOnly={!canEvaluate} evaluationDate={input.as_of_date} graphic={<DataRing value={comparable ? inRange / decision.metrics.length * 100 : null} display={`${inRange}/${decision.metrics.length}`} label="Indicadores en rango" tone="ok" />}>
       <section className="metrics-grid" aria-label="Resumen del desempeño">
         <Metric icon={<Target size={16} />} label="Indicadores por atender" value={result ? ['sin_meta', 'not_calculable'].includes(result.status) ? 'Sin evaluar' : `${decision.attention.length} de ${decision.metrics.length}` : '—'} hint={decision.unavailable.length ? `${decision.unavailable.length} sin datos suficientes` : 'Fuera de las tolerancias acordadas'} tone={decision.attention.length ? 'warn' : 'default'} />
         <Metric icon={<TrendingUp size={16} />} label="Mayor desviación observada" value={formatPercent(decision.largest)} hint="Diferencia desfavorable respecto a la meta" />
@@ -208,33 +216,33 @@ function ComparePage ({ initialInput }) {
         <DecisionActions result={result} loading={loading} />
       </div>
       <EvaluationTrace input={response?.input || input} project={false} result={result} adjusted={adjusted} />
-      <ScenarioPanel adjusted={adjusted} reset={() => setInput(structuredClone(initialInput))}>
+      {canEvaluate ? <ScenarioPanel adjusted={adjusted} reset={() => setInput(structuredClone(initialInput))}>
         <Panel title="Ajustar indicadores para esta evaluación" subtitle="Estos cambios no se guardan en el ERP." actions={<Button onClick={() => addMetric(setInput)}><Plus size={14} /> Agregar indicador</Button>}>
           <MetricsEditor metrics={input.metrics || []} setInput={setInput} checked={Boolean(result)} evaluated={result?.details?.metrics || []} />
         </Panel>
-      </ScenarioPanel>
+      </ScenarioPanel> : null}
     </ToolPage>
   )
 }
 
-function TrackPage ({ initialInput }) {
+function TrackPage ({ initialInput, canEvaluate, saved }) {
   const baseline = useMemo(() => ({ ...structuredClone(initialInput), actual_progress_percent: completedMilestonePercent(initialInput.milestones) ?? initialInput.actual_progress_percent }), [initialInput])
   const evaluate = useCallback(async ({ input }) => runTrackProjectProgress({ input }), [])
-  const { input, response, loading, error, setInput: updateInput } = useToolEvaluation(() => structuredClone(baseline), evaluate)
+  const { input, response, loading, error, setInput: updateInput } = useToolEvaluation(() => structuredClone(baseline), evaluate, { enabled: canEvaluate, storedResponse: saved })
   function setInput (update) {
     updateInput(current => {
       const next = typeof update === 'function' ? update(current) : update
       return { ...next, actual_progress_percent: completedMilestonePercent(next.milestones) ?? initialInput.actual_progress_percent }
     })
   }
-  const evaluationDate = response?.input?.as_of_date || localToday()
+  const evaluationDate = response?.input?.as_of_date || (canEvaluate ? localToday() : initialInput.as_of_date)
   const result = response?.result
   const decision = useMemo(() => projectDecision({ ...input, as_of_date: evaluationDate }, result), [input, result, evaluationDate])
   const { visual } = decision
-  const adjusted = JSON.stringify(input) !== JSON.stringify(baseline)
+  const adjusted = canEvaluate && JSON.stringify(input) !== JSON.stringify(baseline)
   const milestones = [...visual.milestones].sort((a, b) => Number(b.isOverdue || b.status === 'blocked') - Number(a.isOverdue || a.status === 'blocked') || (a.dueDate?.getTime() || Infinity) - (b.dueDate?.getTime() || Infinity))
   return (
-    <ToolPage headline={decision.headline} context={input.project_name || 'Proyecto seleccionado'} result={result} loading={loading} error={error} adjusted={adjusted} graphic={<DataRing value={result ? visual.actualProgress : null} label="Avance real" tone="info" />}>
+    <ToolPage headline={decision.headline} context={input.project_name || 'Proyecto seleccionado'} result={result} loading={loading} error={error} adjusted={adjusted} readOnly={!canEvaluate} evaluationDate={evaluationDate} graphic={<DataRing value={result ? visual.actualProgress : null} label="Avance real" tone="info" />}>
       <section className="metrics-grid" aria-label="Resumen del proyecto">
         <Metric icon={<Target size={16} />} label="Avance alcanzado" value={result ? formatPercent(visual.actualProgress) : '—'} hint={`Planificado: ${formatPercent(visual.plannedProgress)}`} />
         <Metric icon={<TrendingUp size={16} />} label="Posición frente al plan" value={result && visual.actualProgress !== null && visual.plannedProgress !== null ? `${decisionNumber(Math.abs(visual.actualProgress - visual.plannedProgress))} pp` : '—'} hint={progressDifference(visual.plannedProgress, visual.actualProgress)} tone={result ? toneForStatus(result.status) : 'default'} />
@@ -246,7 +254,7 @@ function TrackPage ({ initialInput }) {
           <Panel title="Avance y presupuesto" subtitle="Compara el cumplimiento del plan con el uso de los recursos.">
             <ProgressPair visual={visual} />
             <div className="budget-context"><span>Gasto: <strong>{decisionAmount(input.budget?.actual_amount, input.budget?.currency)}</strong></span><span>Presupuesto: <strong>{decisionAmount(input.budget?.planned_amount, input.budget?.currency)}</strong></span></div>
-            <p className="supporting-copy">{Array.isArray(input.milestones) && completedMilestonePercent(input.milestones) !== null ? 'El avance real se calcula con los hitos completados; los cancelados no cuentan.' : 'El avance real corresponde al dato disponible del proyecto.'}</p>
+            <p className="supporting-copy">{!canEvaluate ? 'El avance corresponde a la evaluación guardada en la fecha de corte.' : Array.isArray(input.milestones) && completedMilestonePercent(input.milestones) !== null ? 'El avance real se calcula con los hitos completados; los cancelados no cuentan.' : 'El avance real corresponde al dato disponible del proyecto.'}</p>
           </Panel>
           <Panel title="Compromisos del proyecto" subtitle="Primero los vencidos o bloqueados; después los compromisos pendientes.">
             {decision.upcoming ? <p className="next-commitment"><CalendarDays size={16} aria-hidden="true" /> Próximo compromiso: <strong>{decision.upcoming.name}</strong> · {erpDate(decision.upcoming.dueDate.toISOString(), true)}</p> : null}
@@ -260,22 +268,22 @@ function TrackPage ({ initialInput }) {
         <DecisionActions result={result} loading={loading} risks={result?.risk_reasons || []} />
       </div>
       <EvaluationTrace input={response?.input || { ...input, as_of_date: evaluationDate }} project result={result} adjusted={adjusted} sourceInput={initialInput} />
-      <ScenarioPanel adjusted={adjusted} reset={() => updateInput(structuredClone(baseline))}>
+      {canEvaluate ? <ScenarioPanel adjusted={adjusted} reset={() => updateInput(structuredClone(baseline))}>
         <Panel title="Ajustar compromisos para esta evaluación" subtitle="Estos cambios no se guardan en el ERP." actions={<Button onClick={() => addMilestone(setInput)}><Plus size={14} /> Agregar hito</Button>}>
           <MilestonesEditor milestones={input.milestones || []} checked={Boolean(result)} setInput={setInput} />
         </Panel>
-      </ScenarioPanel>
+      </ScenarioPanel> : null}
     </ToolPage>
   )
 }
 
-function ToolPage ({ headline, context, result, loading, error, adjusted, graphic, children }) {
+function ToolPage ({ headline, context, result, loading, error, adjusted, readOnly, evaluationDate, graphic, children }) {
   return <div className="page-stack">
     <section className={`decision-hero tone-${toneForStatus(result?.status)}`} aria-label="Conclusión de la evaluación" aria-busy={loading}>
       <div className="decision-copy"><div className="decision-hero-top"><span className="eyebrow">Resumen ejecutivo</span><StatusChip status={loading ? 'Actualizando' : STATUS_LABELS[result?.status] || 'Pendiente'} tone={loading ? 'neutral' : toneForStatus(result?.status)} /></div>
       <p className="hero-context">{context}</p>
       <h2>{error ? 'No se pudo completar la evaluación' : headline}</h2>
-      <p role="status">{adjusted ? 'Escenario ajustado · los datos originales del ERP no se han modificado.' : 'Evaluación de los datos disponibles del registro seleccionado.'}</p>
+      <p role="status">{readOnly ? `Solo consulta · resultado guardado al corte del ${erpDate(evaluationDate, true)}. No se recalcula a la fecha de hoy.` : adjusted ? 'Escenario ajustado · los datos originales del ERP no se han modificado.' : 'Evaluación de los datos disponibles del registro seleccionado.'}</p>
       </div>{graphic}
     </section>
     {error ? <ErrorState title="Revisa la información antes de tomar una decisión" detail={error} /> : null}
