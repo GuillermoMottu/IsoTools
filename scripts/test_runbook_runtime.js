@@ -119,7 +119,8 @@ try {
     const row = (seq, input) => ({ seq, event_id: `qa-runtime-${tool}-${seq}`, correlation_id: `qa-runtime-${tool}-${seq}`, timestamp: '2026-10-20T12:00:00Z', module_id: 'qa_runbook', asset_id: 'QA-ERP', plant_id: 'QA-PLANT', event_type: type, metadata: { test: true }, data: input })
     fixture = { tool, type, rows: [row(1, {}), row(2, data)], accepted: new Map(), attempts: [], queries: [] }
     let running = await startTool(tool, coreBase + '/api/v1', stateDir)
-    await waitFor(async () => (await running.status()).cursor === 2, 'malformed input must not block the valid input')
+    // The cursor is durable before tick() finishes and updates readiness.
+    await waitFor(async () => (await running.status()).cursor === 2 && (await fetch(running.base + '/ready')).status === 200, 'malformed input must not block the valid input or readiness')
     assert.equal((await fetch(running.base + '/ready')).status, 200)
     assert.equal((await fetch(running.base + '/auth/me')).status, 401)
     assert.equal((await fetch(running.base + `/api/tool/${tool}/run`, { method: 'POST', headers: { 'x-api-key': toolKey, 'content-type': 'application/json' }, body: '{"input":{}}' })).status, 400)
