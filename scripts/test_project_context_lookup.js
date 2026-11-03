@@ -9,6 +9,7 @@ import addFormats from 'ajv-formats'
 import { resolveProjectContext } from '../src/utils/projectContext.js'
 import { createToolConsumer } from '../src/services/toolConsumer.js'
 import { replayToolsReadonly } from './replay_tools_readonly.js'
+import { runTrackProjectProgress } from '../demo-frontend/src/api.js'
 
 const configUrl = new URL('./fixtures/tpp_projects.development.json', import.meta.url)
 const config = JSON.parse(await readFile(configUrl, 'utf8'))
@@ -100,6 +101,18 @@ try {
   assert.equal((await run({ projectId: 42 })).status, 400)
   const explicitNull = await run({ projectId: 'QA-PRJ-ISO', actual_progress_percent: null })
   assert.equal(explicitNull.status, 400, 'explicit invalid facts are not replaced by configured values')
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = (url, options) => originalFetch(new URL(url, endpoint), { ...options, headers: { ...options.headers, 'x-api-key': 'fixture-project-machine-key' } })
+    const unavailable = await runTrackProjectProgress({ input: { project_id: 'UNKNOWN' } })
+    assert.equal(unavailable.result.status, 'not_calculable', 'frontend preserves the real HTTP 400 evaluation')
+    assert.ok(unavailable.result.data_quality.missing_fields.includes('organization_id'))
+    assert.ok(unavailable.result.data_quality.missing_fields.includes('planned_progress_percent'))
+    const available = await runTrackProjectProgress({ input: { project_id: 'QA-PRJ-ISO' } })
+    assert.equal(available.result.status, 'at_risk', 'configured project context remains calculable')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
   assert.deepEqual(app.consumer.snapshot(), state, 'API evaluation does not publish or move the consumer cursor')
   app.stop()
   server.closeAllConnections()

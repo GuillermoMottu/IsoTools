@@ -1,4 +1,4 @@
-import { healthResponseIsOnline } from '../displayValues.js'
+import { healthResponseIsOnline, comparisonPlot } from '../displayValues.js'
 import { cloneElement, isValidElement, useId, useEffect, useState } from 'react'
 import { AlertTriangle, ArrowLeft, Loader2, LogOut } from 'lucide-react'
 
@@ -158,10 +158,10 @@ export function Panel ({ title, subtitle, actions, children, className = '' }) {
   )
 }
 
-export function Metric ({ label, value, hint, tone = 'default' }) {
+export function Metric ({ label, value, hint, icon, tone = 'default' }) {
   return (
     <div className={`metric tone-${tone}`}>
-      <p>{label}</p>
+      <div className="metric-top"><p>{label}</p>{icon ? <span className="metric-icon" aria-hidden="true">{icon}</span> : null}</div>
       <strong>{value}</strong>
       {hint ? <span>{hint}</span> : null}
     </div>
@@ -175,6 +175,28 @@ export function StatusChip ({ status, tone = 'neutral' }) {
       {status}
     </span>
   )
+}
+
+export function DataRing ({ value, label, display, tone = 'info' }) {
+  const available = typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100
+  const visible = available ? display || `${value}%` : '—'
+  return <div className={`data-ring tone-${tone}`} role="img" aria-label={`${label}: ${available ? visible : 'No disponible'}`}>
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <circle className="ring-track" cx="60" cy="60" r="51" />
+      {available ? <circle className="ring-value" cx="60" cy="60" r="51" pathLength="100" strokeDasharray={`${value} ${100 - value}`} transform="rotate(-90 60 60)" /> : null}
+    </svg>
+    <div className="ring-caption" aria-hidden="true"><strong>{visible}</strong><span>{label}</span></div>
+  </div>
+}
+
+export function ComparisonBars ({ planned, actual, tone = 'info' }) {
+  const plot = comparisonPlot(planned, actual)
+  if (!plot) return null
+  return <div className={`comparison-chart tone-${tone}`} role="img" aria-label={`Comparación en una misma escala: meta ${planned}, resultado ${actual}`}>
+    {[['planned', 'Meta'], ['actual', 'Real']].map(([key, label]) => <div className="comparison-chart-row" key={key}>
+      <span>{label}</span><div className={`comparison-track ${key}`}><i style={{ left: `${plot[key].start}%`, width: `${plot[key].width}%` }} /><span className="comparison-zero" style={{ left: `${plot.zero}%` }} /></div>
+    </div>)}
+  </div>
 }
 
 export function Badge ({ children, tone = 'neutral' }) {

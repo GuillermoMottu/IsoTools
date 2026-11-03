@@ -9,7 +9,10 @@ async function postJson (path, payload) {
   }).catch(() => { throw new Error('No se pudo conectar con el servicio. La evaluación se actualizará cuando se restablezca la conexión.') })
 
   const body = await response.json().catch(() => ({}))
-  if (!response.ok) {
+  // A rejected evaluation still carries the data-quality result for the page.
+  const validationResult = response.status === 400 && body?.status === 'ok' && body.result?.status === 'not_calculable' &&
+    Array.isArray(body.result.data_quality?.missing_fields) && Array.isArray(body.result.data_quality?.warnings)
+  if (!response.ok && !validationResult) {
     const message = requestErrorLabel(response.status)
     throw new Error(message)
   }

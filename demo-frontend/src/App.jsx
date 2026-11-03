@@ -1,6 +1,6 @@
 import { completedMilestonePercent } from '../../src/utils/projectMilestones.js'
 import { useCallback, useMemo } from 'react'
-import { Activity, Briefcase, Plus } from 'lucide-react'
+import { Activity, Briefcase, Plus, Target, TrendingUp, Wallet, Clock, ShieldCheck, BarChart3, CalendarDays } from 'lucide-react'
 import {
   AppShell,
   Badge,
@@ -12,17 +12,19 @@ import {
   Loading,
   Metric,
   Mono,
-  PageHeader,
   Panel,
   StatusChip,
   Tab,
-  Table
+  Table,
+  DataRing,
+  ComparisonBars
 } from './components/controlRoom.jsx'
 import { runComparePlannedVsActual, runTrackProjectProgress, localToday } from './api.js'
-import { useErpRecord, erpSummary } from './useErpRecord.js'
-import { cellError, explainResult, fieldError, fieldName, confidenceLabel, warningText, unitLabel, unitCode } from './resultExplanation.js'
+import { useErpRecord } from './useErpRecord.js'
+import { cellError, fieldName, confidenceLabel, warningText, unitLabel, unitCode } from './resultExplanation.js'
 import { useToolEvaluation } from './useToolEvaluation.js'
-import { deriveOperationalVisualModel, deriveProjectVisualModel, progressBarWidth } from './visualModels.js'
+import { progressBarWidth } from './visualModels.js'
+import { comparisonDecision, projectDecision, progressDifference, decisionAmount, decisionNumber, decisionDate, recordLabel } from './decisionSummary.js'
 
 const TOOL_IDS = new Set(['compare_planned_vs_actual', 'track_project_progress'])
 const BUILD_TOOL_ID = import.meta.env.VITE_TOOL_ID
@@ -80,6 +82,23 @@ const ACTION_LABELS = {
   define_sales_target: 'Definir meta de ventas'
 }
 
+const ACTION_DETAILS = {
+  continue_monitoring: 'Mantener el seguimiento en el próximo corte de información.',
+  review_variance: 'Revisar primero los indicadores fuera de tolerancia y sus causas.',
+  confirm_data_source: 'Confirmar que las metas y los resultados corresponden al mismo periodo.',
+  open_corrective_action: 'Valorar una acción correctiva con el responsable del proceso.',
+  review_root_cause: 'Investigar el origen de las diferencias antes de definir medidas.',
+  notify_process_owner: 'Compartir los hallazgos con el responsable del proceso.',
+  review_project_risk: 'Revisar los compromisos pendientes y los recursos del proyecto.',
+  confirm_milestone_plan: 'Confirmar fechas y condiciones para cumplir los próximos compromisos.',
+  escalate_project_review: 'Llevar los riesgos del proyecto a la instancia de decisión correspondiente.',
+  open_recovery_plan: 'Valorar medidas para recuperar los compromisos y el avance previsto.',
+  notify_project_owner: 'Compartir las prioridades de atención con el responsable del proyecto.',
+  complete_required_data: 'Completar la información señalada antes de utilizar el resultado.',
+  review_input_quality: 'Confirmar los datos que presentan avisos o inconsistencias.',
+  define_sales_target: 'Acordar una meta de ventas para poder comparar el resultado del periodo.'
+}
+
 const RISK_LABELS = {
   schedule_variance: 'Avance por debajo de lo planificado',
   critical_milestone_overdue: 'Hito crítico vencido',
@@ -133,20 +152,19 @@ function ErpTool ({ tool }) {
   const project = tool.id === 'track_project_progress'
   const id = record?.[project ? 'project_id' : 'analysis_id'] || requested
   return <div className="page-stack">
-    <Panel title={project ? 'Proyecto' : 'Análisis'} subtitle="Registros recibidos por la tool. Selecciona uno para consultar su evaluación.">
-      {!loading && !error ? <div className="metrics-grid erp-summary">{erpSummary(records, tool.id).map(item => <Metric key={item.label} label={item.label} value={item.value} hint={item.hint} />)}</div> : null}
+    <section className="record-picker" aria-label={project ? 'Proyecto en revisión' : 'Análisis en revisión'}>
       <Field label={project ? 'Seleccionar proyecto' : 'Seleccionar análisis'}>
         <select className="input" value={id} disabled={loading || Object.keys(records).length === 0} onChange={event => setRequested(event.target.value)}>
           <option value="">Selecciona un registro del ERP</option>
           {requested && !Object.hasOwn(records, requested) ? <option value={requested}>Registro no disponible: {requested}</option> : null}
-          {Object.entries(records).map(([id, value]) => <option key={id} value={id}>{project ? `${value.project_name || id} · ${id}` : `${value.plant_id || 'Análisis'} · ${id}`}</option>)}
+          {Object.entries(records).map(([id, value]) => <option key={id} value={id}>{recordLabel(value, project)}</option>)}
         </select>
       </Field>
-    </Panel>
-    {record ? <p className="source-note">{record.test ? 'Datos de prueba · ' : ''}Fuente: {record.source?.source_system === 'microsip' ? 'ERP Microsip' : record.source?.source_system || 'No disponible'} · actualizado {erpDate(record.source?.source_extracted_at)}</p> : null}
+      <div className="record-context"><span>{Object.keys(records).length} {project ? 'proyectos disponibles' : 'análisis disponibles'}</span>{record ? <span>{record.test ? 'Datos de prueba · ' : ''}Datos del {erpDate(record.source?.source_extracted_at)}</span> : null}</div>
+    </section>
     {loading ? <Loading label="Leyendo registros" /> : error ? <ErrorState title="No se pudieron consultar los registros" detail={error} /> : record
       ? project ? <TrackPage key={JSON.stringify(record)} tool={tool} initialInput={record} /> : <ComparePage key={JSON.stringify(record)} tool={tool} initialInput={record} />
-      : <EmptyState title={Object.keys(records).length === 0 ? project ? 'Aún no hay proyectos' : 'Aún no hay análisis' : requested ? 'Registro no disponible' : 'Selecciona un registro'} detail={Object.keys(records).length === 0 ? 'Los registros aparecerán cuando llegue un evento a la tool.' : requested ? 'La referencia solicitada no está disponible.' : 'Selecciona un registro existente para consultar su evaluación.'} />}
+      : <EmptyState title={Object.keys(records).length === 0 ? project ? 'Aún no hay proyectos' : 'Aún no hay análisis' : requested ? 'Registro no disponible' : 'Selecciona un registro'} detail={Object.keys(records).length === 0 ? 'La información aparecerá cuando se actualicen los datos del ERP.' : requested ? 'La referencia solicitada no está disponible.' : 'Elige un registro para ver su resumen y las prioridades de atención.'} />}
   </div>
 }
 
@@ -156,234 +174,173 @@ function ErpValue ({ label, value }) {
 
 function erpDate (value, dateOnly = false) {
   if (!value || Number.isNaN(Date.parse(value))) return 'No disponible'
-  if (dateOnly && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split('-').reverse().join('/')
+  if (dateOnly) return decisionDate(value)
   return new Date(value).toLocaleString('es-MX', dateOnly ? { year: 'numeric', month: '2-digit', day: '2-digit' } : undefined)
 }
 
-function ComparePage ({ tool, initialInput }) {
+function ComparePage ({ initialInput }) {
   const { input, setInput, response, loading, error } = useToolEvaluation(() => structuredClone(initialInput), runComparePlannedVsActual)
   const result = response?.result
-  const visual = useMemo(() => deriveOperationalVisualModel(input, result), [input, result])
-
-  const dataQuality = result?.data_quality
-  const missingFields = dataQuality?.missing_fields || []
-  const warnings = dataQuality?.warnings || []
-  const displayStatus = result?.status || 'pending'
-
+  const decision = useMemo(() => comparisonDecision(result), [result])
+  const adjusted = JSON.stringify(input) !== JSON.stringify(initialInput)
+  const quality = result?.data_quality
+  const inRange = decision.metrics.filter(metric => metric.status === 'on_track').length
+  const comparable = result && !['sin_meta', 'not_calculable'].includes(result.status) && decision.metrics.length > 0
   return (
-    <ToolPage
-      tool={tool}
-      loading={loading}
-      error={error}
-      response={response}
-      metrics={(
-        <>
-          <Metric label="Estado" value={STATUS_LABELS[displayStatus] || 'Pendiente'} tone={toneForStatus(displayStatus)} />
-          <Metric label="Mayor desviación" value={formatPercent(visual.deviationPercent)} hint="Mayor diferencia desfavorable respecto a la meta" tone={toneForStatus(visual.status)} />
-          <Metric label="Desviación ponderada" value={formatPercent(visual.weightedDeviationPercent)} hint="Promedio ponderado" />
-          <Metric label="Calidad de los datos" value={result ? confidenceLabel(dataQuality?.confidence) : 'Pendiente'} hint={`${missingFields.length} faltantes · ${warnings.length} avisos`} tone={result ? missingFields.length ? 'danger' : warnings.length ? 'warn' : 'ok' : 'default'} />
-        </>
-      )}
-    >
-      <div className="tool-grid">
-        <div className="stack">
-          <Panel title="Datos de comparación" subtitle="Información del ERP · solo lectura">
-            <div className="form-grid">
-              <ErpValue label="Organización" value={input.organization_id} />
-              <ErpValue label="Referencia del análisis" value={input.analysis_id} />
-              <ErpValue label="Planta" value={input.plant_id} />
-              <ErpValue label="Fecha de corte" value={erpDate(input.as_of_date)} />
-              <ErpValue label="Periodo" value={{ daily: 'Diario', weekly: 'Semanal', monthly: 'Mensual' }[input.period] || input.period || 'No disponible'} />
-              <ErpValue label="Umbral de desviación (%)" value={input.thresholds?.deviation_percent ?? input.thresholds?.deviationPercent ?? '5 (predeterminado)'} />
-              <ErpValue label="Umbral crítico (%)" value={input.thresholds?.critical_percent ?? input.thresholds?.criticalPercent ?? '15 (predeterminado)'} />
-            </div>
-          </Panel>
-
-          <Panel
-            title="Indicadores: metas y resultados"
-            subtitle="Compara cada indicador en su unidad. La importancia determina su contribución al promedio."
-            actions={<Button onClick={() => addMetric(setInput)}> <Plus size={14} /> Agregar</Button>}
-          >
-            <MetricsEditor metrics={input.metrics || []} setInput={setInput} checked={Boolean(result)} evaluated={result?.details?.metrics || []} />
-          </Panel>
-        </div>
-
-        <ResultColumn
-          tool={tool}
-          result={result}
-          response={response}
-          loading={loading}
-          missingFields={missingFields}
-          warnings={warnings}
-        />
+    <ToolPage headline={decision.headline} context={initialInput.domain === 'sales' ? 'Ventas del periodo' : 'Resultados del periodo'} result={result} loading={loading} error={error} adjusted={adjusted} graphic={<DataRing value={comparable ? inRange / decision.metrics.length * 100 : null} display={`${inRange}/${decision.metrics.length}`} label="Indicadores en rango" tone="ok" />}>
+      <section className="metrics-grid" aria-label="Resumen del desempeño">
+        <Metric icon={<Target size={16} />} label="Indicadores por atender" value={result ? ['sin_meta', 'not_calculable'].includes(result.status) ? 'Sin evaluar' : `${decision.attention.length} de ${decision.metrics.length}` : '—'} hint={decision.unavailable.length ? `${decision.unavailable.length} sin datos suficientes` : 'Fuera de las tolerancias acordadas'} tone={decision.attention.length ? 'warn' : 'default'} />
+        <Metric icon={<TrendingUp size={16} />} label="Mayor desviación observada" value={formatPercent(decision.largest)} hint="Diferencia desfavorable respecto a la meta" />
+        <Metric icon={<BarChart3 size={16} />} label="Desviación ponderada" value={formatPercent(result?.weighted_deviation_percent)} hint="Promedio según la importancia de cada indicador" />
+        <Metric icon={<ShieldCheck size={16} />} label="Calidad de la información" value={result ? confidenceLabel(quality?.confidence) : 'Pendiente'} hint={result ? `${quality?.missing_fields?.length || 0} faltantes · ${quality?.warnings?.length || 0} avisos` : 'Evaluación en curso'} />
+      </section>
+      <div className="decision-grid">
+        <Panel title="Dónde concentrar la atención" subtitle="Los indicadores con mayor prioridad aparecen primero.">
+          {!result ? error ? <EmptyState title="Evaluación no disponible" detail="Revisa el mensaje de la evaluación antes de utilizar estos datos." /> : <Loading label="Preparando los indicadores" /> : decision.metrics.length ? <div className="indicator-list">
+            {decision.metrics.map((metric, index) => <article className="indicator-card" key={`${metric.metric_id}-${index}`}>
+              <div className="indicator-heading"><strong>{metric.name || 'Indicador sin nombre'}</strong><StatusChip status={STATUS_LABELS[metric.status] || 'Sin evaluar'} tone={toneForStatus(metric.status)} /></div>
+              <div className="comparison-values"><span>Meta <b>{displayQuantity(metric.planned, metric.unit)}</b></span><span>Resultado <b>{displayQuantity(metric.actual, metric.unit)}</b></span><span>Diferencia desfavorable <b>{formatPercent(metric.adverse_percent)}</b></span></div>
+              <ComparisonBars planned={metric.planned} actual={metric.actual} tone={toneForStatus(metric.status)} />
+              <p>{metric.status === 'on_track' ? 'Dentro de la tolerancia acordada.' : metric.status === 'not_calculable' ? 'Completa o confirma los datos antes de tomar una decisión.' : metric.direction === 'lower_is_better' ? 'El resultado supera el máximo esperado. Revisa las causas de la diferencia.' : metric.direction === 'higher_is_better' ? 'El resultado está por debajo de la meta. Revisa las causas de la diferencia.' : 'El resultado se aleja del objetivo. Revisa las causas de la diferencia.'}</p>
+            </article>)}
+          </div> : <EmptyState title={result.status === 'sin_meta' ? 'Define la meta del periodo' : 'Sin indicadores evaluados'} detail="Se necesita una meta y un resultado comparables para medir el desempeño." />}
+        </Panel>
+        <DecisionActions result={result} loading={loading} />
       </div>
+      <EvaluationTrace input={response?.input || input} project={false} result={result} adjusted={adjusted} />
+      <ScenarioPanel adjusted={adjusted} reset={() => setInput(structuredClone(initialInput))}>
+        <Panel title="Ajustar indicadores para esta evaluación" subtitle="Estos cambios no se guardan en el ERP." actions={<Button onClick={() => addMetric(setInput)}><Plus size={14} /> Agregar indicador</Button>}>
+          <MetricsEditor metrics={input.metrics || []} setInput={setInput} checked={Boolean(result)} evaluated={result?.details?.metrics || []} />
+        </Panel>
+      </ScenarioPanel>
     </ToolPage>
   )
 }
 
-function TrackPage ({ tool, initialInput }) {
-  const evaluate = useCallback(async ({ input }) => {
-    return runTrackProjectProgress({ input })
-  }, [])
-  const evaluation = useToolEvaluation(() => ({ ...structuredClone(initialInput), actual_progress_percent: completedMilestonePercent(initialInput.milestones) ?? initialInput.actual_progress_percent }), evaluate)
-  const { input, response, loading, error } = evaluation
+function TrackPage ({ initialInput }) {
+  const baseline = useMemo(() => ({ ...structuredClone(initialInput), actual_progress_percent: completedMilestonePercent(initialInput.milestones) ?? initialInput.actual_progress_percent }), [initialInput])
+  const evaluate = useCallback(async ({ input }) => runTrackProjectProgress({ input }), [])
+  const { input, response, loading, error, setInput: updateInput } = useToolEvaluation(() => structuredClone(baseline), evaluate)
   function setInput (update) {
-    evaluation.setInput(current => {
+    updateInput(current => {
       const next = typeof update === 'function' ? update(current) : update
       return { ...next, actual_progress_percent: completedMilestonePercent(next.milestones) ?? initialInput.actual_progress_percent }
     })
   }
   const evaluationDate = response?.input?.as_of_date || localToday()
   const result = response?.result
-  const visual = useMemo(() => deriveProjectVisualModel({ ...input, as_of_date: evaluationDate }, result), [input, result, evaluationDate])
-  const summary = result?.milestone_summary || {}
-
-  const dataQuality = result?.data_quality
-  const missingFields = dataQuality?.missing_fields || []
-  const warnings = dataQuality?.warnings || []
-  const risks = result?.risk_reasons || visual.risks || []
-  const displayStatus = result?.status || 'pending'
-  const overdueCount = summary.overdue ?? countOverdue(visual.milestones)
-  const criticalOverdueCount = summary.critical_overdue ?? countCriticalOverdue(visual.milestones)
-  const blockedCount = summary.blocked ?? countBlocked(visual.milestones)
-
+  const decision = useMemo(() => projectDecision({ ...input, as_of_date: evaluationDate }, result), [input, result, evaluationDate])
+  const { visual } = decision
+  const adjusted = JSON.stringify(input) !== JSON.stringify(baseline)
+  const milestones = [...visual.milestones].sort((a, b) => Number(b.isOverdue || b.status === 'blocked') - Number(a.isOverdue || a.status === 'blocked') || (a.dueDate?.getTime() || Infinity) - (b.dueDate?.getTime() || Infinity))
   return (
-    <ToolPage
-      tool={tool}
-      loading={loading}
-      error={error}
-      response={response}
-      metrics={(
-        <>
-          <Metric label="Estado" value={STATUS_LABELS[displayStatus] || 'Pendiente'} tone={toneForStatus(displayStatus)} />
-          <Metric label="Avance planificado / real" value={`${formatPercent(visual.plannedProgress)} / ${formatPercent(visual.actualProgress)}`} />
-          <Metric label="Hitos abiertos" value={`${overdueCount} vencidos`} hint={`${criticalOverdueCount} críticos · ${blockedCount} bloqueados`} tone={(overdueCount || blockedCount) ? 'warn' : 'ok'} />
-          <Metric label="Presupuesto utilizado" value={formatPercent(visual.budgetUsedPercent)} hint={`Diferencia de avance: ${visual.scheduleVariancePercent === null ? "No disponible" : `${visual.scheduleVariancePercent} puntos porcentuales`}`} tone={toneForStatus(visual.status)} />
-        </>
-      )}
-    >
-      <div className="tool-grid">
+    <ToolPage headline={decision.headline} context={input.project_name || 'Proyecto seleccionado'} result={result} loading={loading} error={error} adjusted={adjusted} graphic={<DataRing value={result ? visual.actualProgress : null} label="Avance real" tone="info" />}>
+      <section className="metrics-grid" aria-label="Resumen del proyecto">
+        <Metric icon={<Target size={16} />} label="Avance alcanzado" value={result ? formatPercent(visual.actualProgress) : '—'} hint={`Planificado: ${formatPercent(visual.plannedProgress)}`} />
+        <Metric icon={<TrendingUp size={16} />} label="Posición frente al plan" value={result && visual.actualProgress !== null && visual.plannedProgress !== null ? `${decisionNumber(Math.abs(visual.actualProgress - visual.plannedProgress))} pp` : '—'} hint={progressDifference(visual.plannedProgress, visual.actualProgress)} tone={result ? toneForStatus(result.status) : 'default'} />
+        <Metric icon={<Clock size={16} />} label="Compromisos vencidos" value={result ? decision.overdue.length : '—'} hint={`${decision.open.length} abiertos · ${decision.blocked.length} bloqueados`} tone={decision.overdue.length || decision.blocked.length ? 'warn' : 'default'} />
+        <Metric icon={<Wallet size={16} />} label="Presupuesto utilizado" value={result ? formatPercent(visual.budgetUsedPercent) : '—'} hint={decisionAmount(input.budget?.actual_amount, input.budget?.currency)} />
+      </section>
+      <div className="decision-grid">
         <div className="stack">
-          <Panel title="Datos del proyecto" subtitle="Información del ERP · solo lectura">
-            <div className="form-grid">
-              <ErpValue label="Organización" value={input.organization_id} />
-              <ErpValue label="Referencia del proyecto" value={input.project_id} />
-              <ErpValue label="Nombre del proyecto" value={input.project_name} />
-              <ErpValue label="Fecha de corte del ERP" value={erpDate(input.as_of_date)} />
-              <ErpValue label="Fecha de evaluación" value={erpDate(evaluationDate, true)} />
-              <ErpValue label="Inicio planificado" value={erpDate(input.planned_start_date, true)} />
-              <ErpValue label="Fin planificado" value={erpDate(input.planned_end_date, true)} />
-            </div>
-          </Panel>
-
-          <Panel title="Avance y presupuesto" subtitle="Datos del ERP y avance calculado a partir de los hitos">
-            <div className="form-grid">
-              <ErpValue label="Avance planificado (%)" value={formatPercent(visual.plannedProgress)} />
-              <ErpValue label="Avance real (%)" value={formatPercent(visual.actualProgress)} />
-              <ErpValue label="Presupuesto planificado" value={input.budget?.planned_amount} />
-              <ErpValue label="Moneda del presupuesto" value={input.budget?.currency} />
-              <ErpValue label="Presupuesto ejercido" value={input.budget?.actual_amount} />
-            </div>
+          <Panel title="Avance y presupuesto" subtitle="Compara el cumplimiento del plan con el uso de los recursos.">
             <ProgressPair visual={visual} />
+            <div className="budget-context"><span>Gasto: <strong>{decisionAmount(input.budget?.actual_amount, input.budget?.currency)}</strong></span><span>Presupuesto: <strong>{decisionAmount(input.budget?.planned_amount, input.budget?.currency)}</strong></span></div>
+            <p className="supporting-copy">{Array.isArray(input.milestones) && completedMilestonePercent(input.milestones) !== null ? 'El avance real se calcula con los hitos completados; los cancelados no cuentan.' : 'El avance real corresponde al dato disponible del proyecto.'}</p>
           </Panel>
-
-          <Panel
-            title="Hitos"
-            subtitle="Los cambios ajustan esta evaluación y no modifican la fuente. Los hitos cancelados no cuentan."
-            actions={<Button onClick={() => addMilestone(setInput)}><Plus size={14} /> Agregar</Button>}
-          >
-            <MilestonesEditor milestones={input.milestones || []} checked={Boolean(result)} setInput={setInput} />
+          <Panel title="Compromisos del proyecto" subtitle="Primero los vencidos o bloqueados; después los compromisos pendientes.">
+            {decision.upcoming ? <p className="next-commitment"><CalendarDays size={16} aria-hidden="true" /> Próximo compromiso: <strong>{decision.upcoming.name}</strong> · {erpDate(decision.upcoming.dueDate.toISOString(), true)}</p> : null}
+            {milestones.length ? <div className="commitment-list">{milestones.map(milestone => <article className={`commitment ${milestone.isOverdue || milestone.status === 'blocked' ? 'attention' : milestone.status === 'completed' ? 'completed' : 'upcoming'}`} key={milestone.id}>
+              <span className="commitment-marker" aria-hidden="true" />
+              <div><strong>{milestone.name}</strong><span>{milestone.dueDate ? erpDate(milestone.dueDate.toISOString(), true) : 'Fecha no disponible'}{milestone.critical ? ' · Crítico para el proyecto' : ''}</span></div>
+              <Badge tone={milestone.isOverdue || milestone.status === 'blocked' ? 'danger' : milestone.status === 'completed' ? 'ok' : 'neutral'}>{milestone.status === 'blocked' ? milestone.isOverdue ? 'Bloqueado y vencido' : 'Bloqueado' : milestone.isOverdue ? 'Vencido' : { pending: 'Pendiente', completed: 'Completado', cancelled: 'Cancelado' }[milestone.status] || 'Por revisar'}</Badge>
+            </article>)}</div> : <EmptyState title="Sin compromisos registrados" detail="No hay hitos disponibles para identificar próximas fechas o bloqueos." />}
           </Panel>
         </div>
-
-        <ResultColumn
-          tool={tool}
-          result={result}
-          response={response}
-          loading={loading}
-          missingFields={missingFields}
-          warnings={warnings}
-          risks={risks}
-        />
+        <DecisionActions result={result} loading={loading} risks={result?.risk_reasons || []} />
       </div>
+      <EvaluationTrace input={response?.input || { ...input, as_of_date: evaluationDate }} project result={result} adjusted={adjusted} sourceInput={initialInput} />
+      <ScenarioPanel adjusted={adjusted} reset={() => updateInput(structuredClone(baseline))}>
+        <Panel title="Ajustar compromisos para esta evaluación" subtitle="Estos cambios no se guardan en el ERP." actions={<Button onClick={() => addMilestone(setInput)}><Plus size={14} /> Agregar hito</Button>}>
+          <MilestonesEditor milestones={input.milestones || []} checked={Boolean(result)} setInput={setInput} />
+        </Panel>
+      </ScenarioPanel>
     </ToolPage>
   )
 }
 
-function ToolPage ({ tool, loading, error, metrics, response, children }) {
-  return (
-    <div className="page-stack">
-      <PageHeader
-        eyebrow={tool.eyebrow}
-        title={tool.label}
-        description={tool.description}
-      />
-      <p role="status">{loading ? 'Actualizando evaluación…' : 'La evaluación se actualiza automáticamente al cambiar los datos.'}</p>
-
-      {error ? <ErrorState title="No se pudo actualizar la evaluación" detail={error} /> : null}
-
-      <section className="metrics-grid">
-        {metrics}
-      </section>
-
-      <fieldset className="evaluation-fields" aria-busy={loading}>
-        <legend className="sr-only">Captura y resultado de la evaluación</legend>
-        {children}
-      </fieldset>
-
-      {!response && !loading ? (
-        <EmptyState title="Evaluación pendiente" detail="Los resultados se actualizarán automáticamente con los datos de la captura." />
-      ) : null}
-    </div>
-  )
+function ToolPage ({ headline, context, result, loading, error, adjusted, graphic, children }) {
+  return <div className="page-stack">
+    <section className={`decision-hero tone-${toneForStatus(result?.status)}`} aria-label="Conclusión de la evaluación" aria-busy={loading}>
+      <div className="decision-copy"><div className="decision-hero-top"><span className="eyebrow">Resumen ejecutivo</span><StatusChip status={loading ? 'Actualizando' : STATUS_LABELS[result?.status] || 'Pendiente'} tone={loading ? 'neutral' : toneForStatus(result?.status)} /></div>
+      <p className="hero-context">{context}</p>
+      <h2>{error ? 'No se pudo completar la evaluación' : headline}</h2>
+      <p role="status">{adjusted ? 'Escenario ajustado · los datos originales del ERP no se han modificado.' : 'Evaluación de los datos disponibles del registro seleccionado.'}</p>
+      </div>{graphic}
+    </section>
+    {error ? <ErrorState title="Revisa la información antes de tomar una decisión" detail={error} /> : null}
+    {children}
+  </div>
 }
 
-function ResultColumn ({ tool, result, response, loading, missingFields, warnings, risks = [] }) {
-  const emitted = response?.emitted_event
-  const downstream = response?.downstream_impact
+function DecisionActions ({ result, loading, risks = [] }) {
+  return <aside className="stack">
+    <Panel title="Qué conviene hacer" subtitle="Recomendaciones para revisión; no ejecutan cambios.">
+      {loading ? <Loading label="Preparando las recomendaciones" /> : <ActionList actions={result?.recommended_actions || []} />}
+    </Panel>
+    {risks.filter(risk => risk !== 'sin_riesgo_abierto').length ? <Panel title="Motivos de atención"><div className="quality-list">{risks.filter(risk => risk !== 'sin_riesgo_abierto').map(risk => <p className="risk-reason" key={risk}>{RISK_LABELS[risk] || 'Revisar las condiciones del proyecto'}</p>)}</div></Panel> : null}
+    <details className="review-details quality-details" open={result?.status === 'not_calculable'}>
+      <summary>¿La información está completa?</summary>
+      {result?.status === 'not_calculable' ? <p className="supporting-copy">Completa o confirma los datos señalados en la fuente de información antes de utilizar la evaluación.</p> : null}
+      <DataQuality loading={loading} pending={!result} missingFields={result?.data_quality?.missing_fields || []} warnings={result?.data_quality?.warnings || []} />
+    </details>
+  </aside>
+}
 
-  return (
-    <aside className="stack">
-      <Panel title="Resultado de la evaluación" subtitle="Esta evaluación prepara información; no publica ni realiza acciones automáticamente.">
-        {loading ? <Loading label="Evaluando información" /> : null}
-        {!loading ? (
-          <div className="status-stack">
-            <StatusChip status={STATUS_LABELS[result?.status] || 'Pendiente'} tone={toneForStatus(result?.status)} />
-            {result ? <div aria-live="polite" className="quality-list">{explainResult(response.input, result).map((line, index) => <p key={index}>{line}</p>)}</div> : <p>Completa la captura para actualizar la evaluación automáticamente.</p>}
-          </div>
-        ) : null}
-      </Panel>
+function EvaluationTrace ({ input, project, result, adjusted, sourceInput = input }) {
+  const thresholds = result?.audit?.thresholds_applied || input.thresholds || {}
+  return <details className="review-details">
+    <summary>Origen y criterios de la evaluación</summary>
+    <p className="supporting-copy">{adjusted ? 'El resultado incluye ajustes de escenario; no representa una actualización del ERP.' : 'Información que respalda el resultado de este registro.'}</p>
+    {project ? <Panel title="Datos del proyecto"><div className="form-grid">
+      <ErpValue label="Organización" value={input.organization_name || input.organization_id} />
+      <ErpValue label="Referencia del proyecto" value={input.project_id} />
+      <ErpValue label="Inicio planificado" value={erpDate(input.planned_start_date, true)} />
+      <ErpValue label="Fin planificado" value={erpDate(input.planned_end_date, true)} />
+      <ErpValue label="Datos del ERP al" value={erpDate(sourceInput.as_of_date)} />
+      <ErpValue label="Fecha de evaluación" value={erpDate(input.as_of_date, true)} />
+    </div></Panel> : <Panel title="Datos de comparación"><div className="form-grid">
+      <ErpValue label="Organización" value={input.organization_name || input.organization_id} />
+      <ErpValue label="Referencia del análisis" value={input.analysis_id} />
+      <ErpValue label="Planta" value={input.plant_name || input.plant_id} />
+      <ErpValue label="Fecha de corte" value={erpDate(input.as_of_date)} />
+      <ErpValue label="Periodo" value={[input.period_start, input.period_end].filter(Boolean).join(' al ')} />
+    </div></Panel>}
+    <div className="form-grid trace-criteria">
+      <ErpValue label="Fuente de la información" value={sourceInput.source?.source_system === 'microsip' ? 'ERP Microsip' : sourceInput.source?.source_system} />
+      <ErpValue label="Última extracción de datos" value={erpDate(sourceInput.source?.source_extracted_at)} />
+      {project ? <>
+        <ErpValue label="Tolerancia de retraso" value={formatPercent(thresholds.at_risk_delay_percent)} />
+        <ErpValue label="Umbral de atraso" value={formatPercent(thresholds.delayed_percent)} />
+        <ErpValue label="Tolerancia de gasto respecto al avance" value={formatPercent(thresholds.budget_overrun_vs_progress_percent)} />
+      </> : <>
+        <ErpValue label="Tolerancia de desviación" value={formatPercent(thresholds.deviation_percent)} />
+        <ErpValue label="Umbral crítico" value={formatPercent(thresholds.critical_percent)} />
+      </>}
+    </div>
+  </details>
+}
 
-      <Panel title="Calidad de los datos">
-        <DataQuality loading={loading} pending={!response} missingFields={missingFields} warnings={warnings} />
-      </Panel>
+function ScenarioPanel ({ adjusted, reset, children }) {
+  return <details className="review-details scenario-details">
+    <summary>Explorar otro escenario</summary>
+    <div className="scenario-notice"><p>Prueba cambios para comparar su efecto en el resultado. No se guardan en el ERP ni generan acciones automáticas.</p><Button onClick={reset} disabled={!adjusted}>Restablecer datos originales</Button></div>
+    {children}
+  </details>
+}
 
-      {risks.length ? (
-        <Panel title="Lectura de riesgo">
-          <div className="chip-list">
-            {risks.map(risk => <Badge tone={risk === 'sin_riesgo_abierto' ? 'ok' : 'warn'} key={risk}>{RISK_LABELS[risk] || 'Riesgo por revisar'}</Badge>)}
-          </div>
-        </Panel>
-      ) : null}
-
-      <Panel title="Acciones recomendadas">
-        <ActionList actions={result?.recommended_actions || []} />
-      </Panel>
-
-      <details className="technical-details">
-        <summary>Detalles técnicos de la evaluación</summary>
-        <p>Evento: <span>{tool.id === 'track_project_progress' ? 'Proyecto en riesgo' : 'Desviación detectada'}</span> · {emitted ? 'Preparado, sin publicar' : 'Sin evento preparado'}</p>
-        {tool.id === 'track_project_progress' ? <p>Regla de seguimiento automático: {downstream?.applies ? 'aplica' : 'no aplica'}. Solo corresponde al estado de riesgo definido por el contrato.</p> : null}
-        <Panel title="Entrada y resultado">
-        <pre className="json-preview">{JSON.stringify(response ? {
-          input: response.input,
-          result: response.result,
-          emitted_event: response.emitted_event
-        } : { pending: true }, null, 2)}</pre>
-        </Panel>
-      </details>
-    </aside>
-  )
+function displayQuantity (value, unit) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${decisionNumber(value)} ${unitLabel(unit)}` : 'No disponible'
 }
 
 function MetricsEditor ({ metrics, setInput, evaluated, checked }) {
@@ -393,11 +350,6 @@ function MetricsEditor ({ metrics, setInput, evaluated, checked }) {
       getRowKey={(row, index) => `${row.metric_id || 'metric'}-${index}`}
       empty={<EmptyState title="Sin indicadores" detail="Agrega al menos un indicador para calcular la comparación." />}
       columns={[
-        {
-          key: 'metric',
-          header: 'Referencia',
-          render: (row, index) => <Input aria-label={`Referencia, indicador ${index + 1}`} error={cellError(row.metric_id, 'metric_id', checked)} value={row.metric_id || ''} onChange={event => updateMetric(setInput, index, 'metric_id', event.target.value)} />
-        },
         ...[['name', 'Nombre'], ['unit', 'Unidad']].map(([key, label]) => ({
           key, header: label,
           render: (row, index) => <Input aria-label={`${label}, indicador ${index + 1}`} error={cellError(row[key], key, checked)} value={key === 'unit' && row[key] ? unitLabel(row[key]) : row[key] || ''} onChange={event => updateMetric(setInput, index, key, key === 'unit' ? unitCode(event.target.value) : event.target.value)} />
@@ -520,14 +472,15 @@ function DataQuality ({ loading, pending, missingFields, warnings }) {
 function ActionList ({ actions }) {
   if (!actions.length) return <EmptyState title="Sin acciones" detail="Las recomendaciones aparecerán al completar la evaluación." />
   return (
-    <div className="action-list">
-      {actions.map(action => (
-        <div className="action-row" key={action}>
-          <span>{ACTION_LABELS[action] || 'Revisar el resultado de la evaluación'}</span>
-
-        </div>
+    <ol className="action-list">
+      {actions.map((action, index) => (
+        <li className="action-row" key={action}>
+          <span className="action-step" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+          <div><strong>{ACTION_LABELS[action] || 'Revisar el resultado de la evaluación'}</strong>
+          {ACTION_DETAILS[action] ? <span>{ACTION_DETAILS[action]}</span> : null}</div>
+        </li>
       ))}
-    </div>
+    </ol>
   )
 }
 
