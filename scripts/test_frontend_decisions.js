@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { comparisonDecision, projectDecision, progressDifference, decisionAmount, decisionDate } from '../demo-frontend/src/decisionSummary.js'
+import { comparisonDecision, metricExplanation, projectDecision, progressDifference, decisionAmount, decisionDate } from '../demo-frontend/src/decisionSummary.js'
 import { runComparePlannedVsActualTool as compare, runTrackProjectProgressTool as track } from '../src/services/compareTrackDemoService.js'
 
 const normal = compare({ scenario: 'on_track' }).result
@@ -14,6 +14,14 @@ assert.equal(comparisonDecision().largest, null)
 assert.deepEqual(comparisonDecision().attention, [])
 assert.match(comparisonDecision({ status: 'sin_meta' }).headline, /Falta una meta/)
 assert.match(comparisonDecision({ status: 'not_calculable' }).headline, /Falta información/)
+for (const direction of ['higher_is_better', 'lower_is_better', 'target_is_best']) {
+  assert.match(metricExplanation({ status: 'sin_meta', direction }), /No hay una meta aprobada/)
+  for (const status of ['not_calculable', 'pending', undefined]) assert.match(metricExplanation({ status, direction }), /confirma los datos/)
+  assert.match(metricExplanation({ status: 'on_track', direction }), /Dentro de la tolerancia/)
+}
+assert.match(metricExplanation({ status: 'critical', direction: 'higher_is_better' }), /por debajo/)
+assert.match(metricExplanation({ status: 'deviation', direction: 'lower_is_better' }), /supera el máximo/)
+assert.match(metricExplanation({ status: 'deviation', direction: 'target_is_best' }), /se aleja del objetivo/)
 assert.equal(progressDifference(30, 50), '20 puntos por delante del plan')
 assert.equal(progressDifference(50, 30), '20 puntos por debajo del plan')
 assert.equal(progressDifference(30, 30), 'Al nivel del plan')

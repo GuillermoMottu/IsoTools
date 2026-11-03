@@ -26,7 +26,7 @@ import { cellError, fieldName, confidenceLabel, warningText, unitLabel, unitCode
 import { useToolEvaluation } from './useToolEvaluation.js'
 import { sessionAccess, storedEvaluation } from './sessionAccess.js'
 import { progressBarWidth } from './visualModels.js'
-import { comparisonDecision, projectDecision, progressDifference, decisionAmount, decisionNumber, decisionDate, recordLabel } from './decisionSummary.js'
+import { comparisonDecision, metricExplanation, projectDecision, progressDifference, decisionAmount, decisionNumber, decisionDate, recordLabel } from './decisionSummary.js'
 
 const TOOL_IDS = new Set(['compare_planned_vs_actual', 'track_project_progress'])
 const BUILD_TOOL_ID = import.meta.env.VITE_TOOL_ID
@@ -209,7 +209,7 @@ function ComparePage ({ initialInput, canEvaluate, saved }) {
               <div className="indicator-heading"><strong>{metric.name || 'Indicador sin nombre'}</strong><StatusChip status={STATUS_LABELS[metric.status] || 'Sin evaluar'} tone={toneForStatus(metric.status)} /></div>
               <div className="comparison-values"><span>Meta <b>{displayQuantity(metric.planned, metric.unit)}</b></span><span>Resultado <b>{displayQuantity(metric.actual, metric.unit)}</b></span><span>Diferencia desfavorable <b>{formatPercent(metric.adverse_percent)}</b></span></div>
               <ComparisonBars planned={metric.planned} actual={metric.actual} tone={toneForStatus(metric.status)} />
-              <p>{metric.status === 'on_track' ? 'Dentro de la tolerancia acordada.' : metric.status === 'not_calculable' ? 'Completa o confirma los datos antes de tomar una decisión.' : metric.direction === 'lower_is_better' ? 'El resultado supera el máximo esperado. Revisa las causas de la diferencia.' : metric.direction === 'higher_is_better' ? 'El resultado está por debajo de la meta. Revisa las causas de la diferencia.' : 'El resultado se aleja del objetivo. Revisa las causas de la diferencia.'}</p>
+              <p>{metricExplanation(metric)}</p>
             </article>)}
           </div> : <EmptyState title={result.status === 'sin_meta' ? 'Define la meta del periodo' : 'Sin indicadores evaluados'} detail="Se necesita una meta y un resultado comparables para medir el desempeño." />}
         </Panel>
@@ -246,7 +246,7 @@ function TrackPage ({ initialInput, canEvaluate, saved }) {
       <section className="metrics-grid" aria-label="Resumen del proyecto">
         <Metric icon={<Target size={16} />} label="Avance alcanzado" value={result ? formatPercent(visual.actualProgress) : '—'} hint={`Planificado: ${formatPercent(visual.plannedProgress)}`} />
         <Metric icon={<TrendingUp size={16} />} label="Posición frente al plan" value={result && visual.actualProgress !== null && visual.plannedProgress !== null ? `${decisionNumber(Math.abs(visual.actualProgress - visual.plannedProgress))} pp` : '—'} hint={progressDifference(visual.plannedProgress, visual.actualProgress)} tone={result ? toneForStatus(result.status) : 'default'} />
-        <Metric icon={<Clock size={16} />} label="Compromisos vencidos" value={result ? decision.overdue.length : '—'} hint={`${decision.open.length} abiertos · ${decision.blocked.length} bloqueados`} tone={decision.overdue.length || decision.blocked.length ? 'warn' : 'default'} />
+        <Metric icon={<Clock size={16} />} label="Compromisos vencidos" value={result?.status === 'not_calculable' ? 'Sin evaluar' : result ? decision.overdue.length : '—'} hint={result?.status === 'not_calculable' ? 'Completa la información del proyecto antes de valorar sus compromisos.' : `${decision.open.length} abiertos · ${decision.blocked.length} bloqueados`} tone={decision.overdue.length || decision.blocked.length ? 'warn' : 'default'} />
         <Metric icon={<Wallet size={16} />} label="Presupuesto utilizado" value={result ? formatPercent(visual.budgetUsedPercent) : '—'} hint={decisionAmount(input.budget?.actual_amount, input.budget?.currency)} />
       </section>
       <div className="decision-grid">

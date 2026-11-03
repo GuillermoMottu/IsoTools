@@ -27,6 +27,15 @@ export function comparisonDecision (result) {
   return { metrics, attention, unavailable, largest, headline }
 }
 
+export function metricExplanation (metric) {
+  if (metric.status === 'sin_meta') return 'No hay una meta aprobada para comparar este resultado.'
+  if (metric.status === 'on_track') return 'Dentro de la tolerancia acordada.'
+  if (!['critical', 'deviation'].includes(metric.status)) return 'Completa o confirma los datos antes de tomar una decisión.'
+  if (metric.direction === 'lower_is_better') return 'El resultado supera el máximo esperado. Revisa las causas de la diferencia.'
+  if (metric.direction === 'higher_is_better') return 'El resultado está por debajo de la meta. Revisa las causas de la diferencia.'
+  return 'El resultado se aleja del objetivo. Revisa las causas de la diferencia.'
+}
+
 export function progressDifference (planned, actual) {
   if (number(planned) === null || number(actual) === null) return 'Sin avance comparable'
   const difference = Math.round((actual - planned) * 100) / 100
